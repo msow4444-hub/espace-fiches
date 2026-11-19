@@ -59,6 +59,12 @@ td.nowrap{white-space:nowrap}
 .qa:last-child{border:0}.qa .q{color:var(--muted);font-size:14px}.qa .a{font-weight:500;overflow-wrap:anywhere}
 .demo{background:var(--accent-soft);color:var(--accent);padding:8px 16px;font-size:14px;text-align:center}
 @media (max-width:760px){.layout{grid-template-columns:1fr}.nav{position:static;flex-direction:row;overflow-x:auto;max-height:none}.nav button{white-space:nowrap}.qa{grid-template-columns:1fr}}
+.sr{position:absolute;left:-9999px;width:1px;height:1px;overflow:hidden}
+#sc{min-width:220px;font-weight:600}
+.pw{position:relative}.pw input{padding-right:46px}
+.eye{position:absolute;right:6px;top:50%;transform:translateY(-50%);border:0;background:transparent;color:var(--muted);cursor:pointer;padding:6px;border-radius:6px;display:flex}
+.eye:hover{color:var(--accent)}
+.card.ok{font-size:15px}
 </style>
 </head>
 <body>
@@ -72,7 +78,7 @@ td.nowrap{white-space:nowrap}
 <script>
 var CFG=window.CONFIG||{};
 var DEMO=!CFG.SUPABASE_URL||location.hash==='#demo';
-var S=null,sb=null,societe=null,user=null,filters={type:'',from:'',to:'',text:''},rows=[],total=0,PAGE=50;
+var S=null,sb=null,soc=[],cur=null,user=null,filters={type:'',from:'',to:'',text:''},rows=[],total=0,PAGE=50;
 var $=function(s){return document.querySelector(s)};
 function esc(s){return String(s==null?'':s).replace(/[&<>"']/g,function(c){return{'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]})}
 function fdate(v){if(!v)return'';var d=new Date(v);return isNaN(d)?String(v):d.toLocaleString('fr-FR',{dateStyle:'medium',timeStyle:'short'})}
@@ -80,31 +86,60 @@ function typeName(u){return S[u]?S[u].title:'Type inconnu'}
 function app(h){$('#app').innerHTML=h}
 
 /* ---------- Accès aux données (réel ou démo) ---------- */
+var VALID=/^[A-Za-z0-9_-]{6,24}$/;
+function genCode(){var a='ABCDEFGHJKLMNPQRSTUVWXYZ23456789',b=new Uint8Array(8);crypto.getRandomValues(b);return Array.from(b,function(x){return a[x%a.length]}).join('')}
+function errMsg(x){var c=x&&x.code,m=(x&&x.message)||String(x);
+ if(c==='23505'||/duplicate key/i.test(m))return'Ce code est déjà utilisé. Choisissez-en un autre.';
+ if(c==='23514'||/code_format/i.test(m))return'Le code doit avoir 6 à 24 caractères : lettres, chiffres, tiret ou tiret bas.';
+ return m}
+function daysLeft(d){return Math.max(0,30-Math.floor((Date.now()-new Date(d))/864e5))}
+function T(r){if(r.error)throw r.error;return r.data}
 var DEMO_ROWS=[
- {id:3,type_fiche:'ahm2fHGsKsTpU58MApoiB4',numero_fiche:'R-014/11/2026',site:null,soumise_le:'2026-11-17T16:20:00Z',donnees:{'p00_etape1/entete_societe':'Société test','p01_a_identification/a_numero_fiche':'R-014/11/2026'}},
- {id:2,type_fiche:'anVthKYbRWT62fEKEv84C7',numero_fiche:'E-007/11/2026',site:'Carrière de Mbour',soumise_le:'2026-11-12T09:05:00Z',donnees:{'p00_etape1/entete_societe':'Société test','p00_etape1/entete_site':'Carrière de Mbour','p01_a_identification/a_numero_fiche':'E-007/11/2026'}},
- {id:1,type_fiche:'aiDFEjzPbb9XhQtxHMkEvp',numero_fiche:'F-100/11/2026',site:'Site de Kédougou',soumise_le:'2026-11-18T10:46:48Z',donnees:{
+ {id:3,societe_id:'s1',supprimee_le:null,type_fiche:'ahm2fHGsKsTpU58MApoiB4',numero_fiche:'R-014/11/2026',site:null,soumise_le:'2026-11-17T16:20:00Z',donnees:{'p00_etape1/entete_societe':'Société test','p01_a_identification/a_numero_fiche':'R-014/11/2026'}},
+ {id:2,societe_id:'s1',supprimee_le:null,type_fiche:'anVthKYbRWT62fEKEv84C7',numero_fiche:'E-007/11/2026',site:'Carrière de Mbour',soumise_le:'2026-11-12T09:05:00Z',donnees:{'p00_etape1/entete_societe':'Société test','p00_etape1/entete_site':'Carrière de Mbour','p01_a_identification/a_numero_fiche':'E-007/11/2026'}},
+ {id:1,societe_id:'s1',supprimee_le:null,type_fiche:'aiDFEjzPbb9XhQtxHMkEvp',numero_fiche:'F-100/11/2026',site:'Site de Kédougou',soumise_le:'2026-11-18T10:46:48Z',donnees:{
   code_societe:'A4159990','p00_etape1/titre':'petite_mine','p00_etape1/entete_societe':'Société test','p00_etape1/entete_site':'Site de Kédougou',
   'p01_a_identification/a_numero_fiche':'F-100/11/2026','p03_c_gps/c_mode':'manuel',
   'p03_c_gps/c_points':[
    {'p03_c_gps/c_points/c_date':'2026-11-18','p03_c_gps/c_points/c_appareil':'Garmin','p03_c_gps/c_points/c_point_num':'-001'},
    {'p03_c_gps/c_points/c_date':'2026-11-18','p03_c_gps/c_points/c_appareil':'Téléphone','p03_c_gps/c_points/c_point_num':'-002'}]}}
 ];
+var DB={soc:[{id:'s1',nom:'Société test',code:'A4159990',supprimee_le:null,cree_le:'2026-11-18T10:00:00Z'}],fiches:DEMO_ROWS,compte:null};
+function demoCheck(code,selfId){if(!code)return;if(!VALID.test(code))throw{code:'23514'};
+ if(DB.soc.some(function(s){return s.id!==selfId&&s.code.toUpperCase()===code.toUpperCase()}))throw{code:'23505'}}
 var api={
- async societe(){ if(DEMO)return{id:'demo',nom:'Société test',code:'A4159990'};
-   var r=await sb.from('societes').select('*').limit(1);if(r.error)throw r.error;return r.data[0]||null},
- async createSociete(nom){ var r=await sb.from('societes').insert({nom:nom}).select().single();if(r.error)throw r.error;return r.data},
- async newCode(){ var a='ABCDEFGHJKLMNPQRSTUVWXYZ23456789',b=new Uint8Array(8);crypto.getRandomValues(b);
-   var c=Array.from(b,function(x){return a[x%a.length]}).join('');
-   if(DEMO){societe.code=c;return c}
-   var r=await sb.from('societes').update({code:c}).eq('id',societe.id).select().single();if(r.error)throw r.error;return r.data.code},
- async list(f,from){ if(DEMO){var l=DEMO_ROWS.filter(function(r){return(!f.type||r.type_fiche===f.type)&&(!f.from||r.soumise_le.slice(0,10)>=f.from)&&(!f.to||r.soumise_le.slice(0,10)<=f.to)});
-     return{data:l.slice(from,from+PAGE),count:l.length}}
-   var q=sb.from('fiches').select('id,type_fiche,numero_fiche,site,soumise_le',{count:'exact'}).order('soumise_le',{ascending:false}).range(from,from+PAGE-1);
-   if(f.type)q=q.eq('type_fiche',f.type);if(f.from)q=q.gte('soumise_le',f.from);if(f.to)q=q.lte('soumise_le',f.to+'T23:59:59');
-   var r=await q;if(r.error)throw r.error;return r},
- async fiche(id){ if(DEMO)return DEMO_ROWS.find(function(r){return r.id==id});
-   var r=await sb.from('fiches').select('*').eq('id',id).single();if(r.error)throw r.error;return r.data}
+ async societes(corb){
+  if(DEMO)return DB.soc.filter(function(s){return corb?s.supprimee_le:!s.supprimee_le});
+  var q=sb.from('societes').select('*').order('cree_le');
+  q=corb?q.not('supprimee_le','is',null):q.is('supprimee_le',null);return T(await q)},
+ async createSociete(nom,code){
+  if(DEMO){demoCheck(code);var s={id:'s'+(DB.soc.length+1),nom:nom,code:code||genCode(),supprimee_le:null,cree_le:new Date().toISOString()};DB.soc.push(s);return s}
+  var row={nom:nom};if(code)row.code=code;return T(await sb.from('societes').insert(row).select().single())},
+ async updateSociete(id,patch){
+  if(DEMO){var s=DB.soc.find(function(x){return x.id===id});if(patch.code)demoCheck(patch.code,id);Object.assign(s,patch);return s}
+  return T(await sb.from('societes').update(patch).eq('id',id).select().single())},
+ async list(f,from){
+  if(DEMO){var l=DB.fiches.filter(function(r){return r.societe_id===cur.id&&!r.supprimee_le&&(!f.type||r.type_fiche===f.type)&&(!f.from||r.soumise_le.slice(0,10)>=f.from)&&(!f.to||r.soumise_le.slice(0,10)<=f.to)});
+   return{data:l.slice(from,from+PAGE),count:l.length}}
+  var q=sb.from('fiches').select('id,type_fiche,numero_fiche,site,soumise_le',{count:'exact'}).eq('societe_id',cur.id).is('supprimee_le',null).order('soumise_le',{ascending:false}).range(from,from+PAGE-1);
+  if(f.type)q=q.eq('type_fiche',f.type);if(f.from)q=q.gte('soumise_le',f.from);if(f.to)q=q.lte('soumise_le',f.to+'T23:59:59');
+  var r=await q;if(r.error)throw r.error;return r},
+ async fiche(id){if(DEMO)return DB.fiches.find(function(r){return r.id==id});return T(await sb.from('fiches').select('*').eq('id',id).single())},
+ async setFicheDeleted(id,del){var v=del?new Date().toISOString():null;
+  if(DEMO){DB.fiches.find(function(r){return r.id==id}).supprimee_le=v;return}
+  T(await sb.from('fiches').update({supprimee_le:v}).eq('id',id).select('id').single())},
+ async corbeilleFiches(){
+  if(DEMO)return DB.fiches.filter(function(r){return r.supprimee_le});
+  return T(await sb.from('fiches').select('id,type_fiche,numero_fiche,site,soumise_le,societe_id,supprimee_le').not('supprimee_le','is',null).order('supprimee_le',{ascending:false}))},
+ async statutCompte(){
+  if(DEMO)return DB.compte;
+  return T(await sb.from('comptes_supprimes').select('supprime_le').maybeSingle())},
+ async supprimerCompte(){
+  if(DEMO){DB.compte={supprime_le:new Date().toISOString()};DB.soc.forEach(function(s){if(!s.supprimee_le)s.supprimee_le=DB.compte.supprime_le});return}
+  T(await sb.rpc('supprimer_mon_compte'))},
+ async restaurerCompte(){
+  if(DEMO){var t=DB.compte.supprime_le;DB.soc.forEach(function(s){if(s.supprimee_le===t)s.supprimee_le=null});DB.compte=null;return}
+  T(await sb.rpc('restaurer_mon_compte'))}
 };
 
 /* ---------- Lecture d'une fiche selon la structure du formulaire ---------- */
@@ -137,13 +172,29 @@ function section(sec,data,ch){var a=collect(sec,sec.name+'/',data,ch,{qa:[],tabl
 function secTitle(s){return s.label.replace(/^Étape 1.*/,'En-tête')}
 
 /* ---------- Écrans ---------- */
+var EYE='<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>';
+var EYEOFF='<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"/><line x1="1" y1="1" x2="23" y2="23"/></svg>';
+var flash='';
+function logout(){if(!DEMO)sb.auth.signOut()}
+function bar(showSel){
+ var left='<h1>Espace gestionnaire</h1>';
+ if(showSel&&soc.length)left='<div class="fit"><label for="sc" class="sr">Société</label><select id="sc">'+soc.map(function(s){return'<option value="'+esc(s.id)+'"'+(cur&&s.id===cur.id?' selected':'')+'>'+esc(s.nom)+'</option>'}).join('')+'</select></div><div class="fit"><button class="btn ghost sm" id="ns">+ Nouvelle société</button></div>';
+ return'<div class="top"><div class="row" style="align-items:center;flex:1 1 300px">'+left+'</div><div class="row" style="flex:0 0 auto;align-items:center"><div class="fit"><button class="btn ghost sm" id="gc">Corbeille</button></div><div class="fit"><button class="btn ghost sm" id="ga">Mon compte</button></div><div class="fit"><button class="btn ghost sm" id="lo">'+(DEMO?'Démo':'Se déconnecter')+'</button></div></div></div>'}
+function bindBar(){
+ var e=$('#sc');if(e)e.onchange=function(){cur=soc.find(function(s){return s.id===e.value});try{localStorage.setItem('soc_cur',cur.id)}catch(x){}filters={type:'',from:'',to:'',text:''};listView()};
+ if($('#ns'))$('#ns').onclick=function(){newSocView(true)};
+ $('#gc').onclick=trashView;$('#ga').onclick=accountView;$('#lo').onclick=logout}
+function pwField(id,auto){return'<div class="pw"><input id="'+id+'" type="password" minlength="8" autocomplete="'+auto+'" required><button type="button" class="eye" id="'+id+'e" aria-label="Afficher le mot de passe" aria-pressed="false">'+EYE+'</button></div>'}
+function bindEye(id){var i=$('#'+id),b=$('#'+id+'e');b.onclick=function(){var show=i.type==='password';i.type=show?'text':'password';b.innerHTML=show?EYEOFF:EYE;b.setAttribute('aria-pressed',show);b.setAttribute('aria-label',show?'Masquer le mot de passe':'Afficher le mot de passe')}}
+
 function authView(mode,msg){
  app('<div style="max-width:440px;margin:40px auto"><div class="card"><h2>Espace gestionnaire</h2><p class="muted">Consultez les fiches d\'enquête de votre société.</p>'
  +'<div class="tabs"><button id="tIn" class="'+(mode==='in'?'on':'')+'">Connexion</button><button id="tUp" class="'+(mode==='up'?'on':'')+'">Créer un compte</button></div>'
  +'<form id="af"><label for="em">Adresse e-mail</label><input id="em" type="email" autocomplete="email" required>'
- +'<label for="pw">Mot de passe</label><input id="pw" type="password" minlength="8" autocomplete="'+(mode==='in'?'current-password':'new-password')+'" required>'
+ +'<label for="pw">Mot de passe</label>'+pwField('pw',mode==='in'?'current-password':'new-password')
  +'<p class="muted" style="font-size:13px;margin-top:6px">'+(mode==='up'?'8 caractères minimum.':'')+'</p>'
  +'<button class="btn" style="width:100%;margin-top:6px">'+(mode==='in'?'Se connecter':'Créer mon compte')+'</button><div id="am" class="'+(msg&&msg.ok?'ok':'err')+'">'+esc(msg?msg.t:'')+'</div></form></div></div>');
+ bindEye('pw');
  $('#tIn').onclick=function(){authView('in')};$('#tUp').onclick=function(){authView('up')};
  $('#af').onsubmit=async function(e){e.preventDefault();var em=$('#em').value.trim(),pw=$('#pw').value;$('#am').textContent='';
   try{
@@ -152,35 +203,56 @@ function authView(mode,msg){
      if(!r.data.session){authView('in',{ok:true,t:'Compte créé. Ouvrez le lien reçu par e-mail pour le confirmer, puis connectez-vous.'});}}
   }catch(x){$('#am').className='err';$('#am').textContent=/Invalid login/i.test(x.message)?'E-mail ou mot de passe incorrect.':/not confirmed/i.test(x.message)?'Adresse e-mail pas encore confirmée.':x.message}}}
 
-function setupView(){
- app('<div style="max-width:440px;margin:40px auto"><div class="card"><h2>Votre société</h2><p class="muted">Donnez le nom de votre société. Un code secret sera créé pour vos enquêteurs.</p>'
- +'<form id="sf"><label for="sn">Nom de la société</label><input id="sn" required maxlength="80"><button class="btn" style="margin-top:12px">Créer</button><div id="sm" class="err"></div></form>'
- +'<p style="margin-top:16px"><button class="btn ghost sm" id="lo">Se déconnecter</button></p></div></div>');
- $('#lo').onclick=function(){sb.auth.signOut()};
- $('#sf').onsubmit=async function(e){e.preventDefault();try{societe=await api.createSociete($('#sn').value.trim());listView()}catch(x){$('#sm').textContent=x.message}}}
+function newSocView(canCancel){
+ app(bar(false)+'<div style="max-width:520px;margin:24px auto"><div class="card"><h2>'+(canCancel?'Nouvelle société':'Votre société')+'</h2><p class="muted">Donnez le nom de la société et choisissez son code. Vos enquêteurs saisiront ce code avant de remplir une fiche.</p>'
+ +'<form id="sf"><label for="sn">Nom de la société</label><input id="sn" required maxlength="80">'
+ +'<label for="sk">Code (6 à 24 caractères : lettres, chiffres, tiret)</label><div class="row" style="align-items:flex-start"><div><input id="sk" maxlength="24" autocomplete="off" spellcheck="false" placeholder="Laisser vide pour en générer un"></div><div class="fit"><button type="button" class="btn ghost" id="gen">Générer</button></div></div>'
+ +'<p class="muted" style="font-size:13px;margin-top:6px">Évitez un code facile à deviner : toute personne qui le connaît peut envoyer des fiches à votre société.</p>'
+ +'<div class="row" style="margin-top:8px"><div class="fit"><button class="btn">Créer la société</button></div>'+(canCancel?'<div class="fit"><button type="button" class="btn ghost" id="cn">Annuler</button></div>':'')+'</div><div id="sm" class="err"></div></form></div></div>');
+ bindBar();$('#gen').onclick=function(){$('#sk').value=genCode()};
+ if($('#cn'))$('#cn').onclick=listView;
+ $('#sf').onsubmit=async function(e){e.preventDefault();var k=$('#sk').value.trim();
+  if(k&&!VALID.test(k)){$('#sm').textContent=errMsg({code:'23514'});return}
+  try{var s=await api.createSociete($('#sn').value.trim(),k);soc=await api.societes();cur=soc.find(function(x){return x.id===s.id})||soc[0];
+   try{localStorage.setItem('soc_cur',cur.id)}catch(x){}filters={type:'',from:'',to:'',text:''};flash='Société créée. Son code : '+cur.code;listView()}catch(x){$('#sm').textContent=errMsg(x)}}}
 
-async function loadList(append){
- var r=await api.list(filters,append?rows.length:0);rows=append?rows.concat(r.data):r.data;total=r.count==null?rows.length:r.count}
+async function loadSocietes(){
+ soc=await api.societes();
+ if(!soc.length){newSocView(false);return}
+ var saved=null;try{saved=localStorage.getItem('soc_cur')}catch(e){}
+ cur=soc.find(function(s){return s.id===saved})||soc[0];filters={type:'',from:'',to:'',text:''};listView()}
+
+async function loadList(append){var r=await api.list(filters,append?rows.length:0);rows=append?rows.concat(r.data):r.data;total=r.count==null?rows.length:r.count}
 function visibleRows(){var t=filters.text.toLowerCase();return rows.filter(function(r){return!t||((r.site||'')+' '+(r.numero_fiche||'')).toLowerCase().indexOf(t)>-1})}
 function tableRows(){var v=visibleRows();if(!v.length)return'<tr><td colspan="5" class="muted">Aucune fiche pour ces critères.</td></tr>';
  return v.map(function(r){return'<tr class="link" data-id="'+r.id+'" tabindex="0"><td class="nowrap">'+esc(fdate(r.soumise_le))+'</td><td><span class="badge">'+esc(typeName(r.type_fiche))+'</span></td><td>'+esc(r.numero_fiche||'—')+'</td><td>'+esc(r.site||'—')+'</td><td><button class="btn ghost sm">Ouvrir</button></td></tr>'}).join('')}
+
 async function listView(){
  var opts='<option value="">Tous les types</option>'+Object.keys(S).map(function(u){return'<option value="'+u+'"'+(filters.type===u?' selected':'')+'>'+esc(S[u].title)+'</option>'}).join('');
- app('<div class="top"><div><h1>'+esc(societe.nom)+'</h1><small>Espace gestionnaire</small></div><button class="btn ghost sm" id="lo">'+(DEMO?'Démo':'Se déconnecter')+'</button></div>'
- +'<div class="card"><h2>Code de votre société</h2><p class="muted">Donnez ce code à vos enquêteurs : ils le saisissent sur la page d\'accueil avant de remplir une fiche.</p>'
- +'<div class="row" style="align-items:center"><div class="fit"><span class="code" id="cd">'+esc(societe.code)+'</span></div><div class="fit"><button class="btn ghost sm" id="cp">Copier</button></div>'
- +'<div class="fit"><button class="btn ghost sm" id="nc">Changer le code</button></div></div><div id="cm" class="muted" style="font-size:14px;margin-top:8px"></div></div>'
+ var fl=flash;flash='';
+ app(bar(true)+(fl?'<div class="card ok" role="status">'+esc(fl)+'</div>':'')
+ +'<div class="card"><h2>Code de la société « '+esc(cur.nom)+' »</h2><p class="muted">Donnez ce code à vos enquêteurs : ils le saisissent sur la page d\'accueil avant de remplir une fiche.</p>'
+ +'<div class="row" style="align-items:center"><div class="fit"><span class="code" id="cd">'+esc(cur.code)+'</span></div><div class="fit"><button class="btn ghost sm" id="cp">Copier</button></div>'
+ +'<div class="fit"><button class="btn ghost sm" id="nc">Changer le code</button></div><div class="fit"><button class="btn ghost sm" id="ds">Supprimer cette société</button></div></div><div id="cm" style="margin-top:10px"></div></div>'
  +'<div class="card"><h2>Fiches reçues</h2><div class="row"><div><label for="ft">Type de fiche</label><select id="ft">'+opts+'</select></div>'
  +'<div><label for="ff">Du</label><input id="ff" type="date" value="'+filters.from+'"></div><div><label for="fu">Au</label><input id="fu" type="date" value="'+filters.to+'"></div>'
  +'<div><label for="fx">Site ou numéro</label><input id="fx" value="'+esc(filters.text)+'" placeholder="Rechercher"></div></div>'
  +'<div class="scroll" style="margin-top:12px"><table><thead><tr><th>Date</th><th>Type</th><th>N° fiche</th><th>Site</th><th></th></tr></thead><tbody id="tb"><tr><td colspan="5" class="muted">Chargement…</td></tr></tbody></table></div>'
  +'<div class="row" style="margin-top:12px;align-items:center"><div id="cnt" class="muted" style="font-size:14px"></div><div class="fit"><button class="btn ghost sm" id="more" hidden>Voir plus</button></div><div class="fit"><button class="btn sm" id="xl">Exporter la liste (Excel)</button></div></div></div>');
- $('#lo').onclick=function(){if(!DEMO)sb.auth.signOut()};
- $('#cp').onclick=async function(){try{await navigator.clipboard.writeText(societe.code);$('#cm').textContent='Code copié.'}catch(e){$('#cm').textContent='Sélectionnez le code et copiez-le.'}};
- $('#nc').onclick=function(){$('#cm').innerHTML='Les enquêteurs devront utiliser le nouveau code. Les fiches déjà reçues restent chez vous. <button class="btn sm" id="ok1">Confirmer</button> <button class="btn ghost sm" id="no1">Annuler</button>';
+ bindBar();
+ $('#cp').onclick=async function(){try{await navigator.clipboard.writeText(cur.code);$('#cm').textContent='Code copié.'}catch(e){$('#cm').textContent='Sélectionnez le code et copiez-le.'}};
+ $('#nc').onclick=function(){
+  $('#cm').innerHTML='<div class="row" style="align-items:flex-start"><div><label for="nk">Nouveau code (6 à 24 caractères)</label><input id="nk" maxlength="24" value="'+genCode()+'" autocomplete="off" spellcheck="false"></div>'
+   +'<div class="fit" style="padding-top:26px"><button class="btn ghost sm" id="g2">Générer un autre</button></div><div class="fit" style="padding-top:26px"><button class="btn sm" id="sv">Enregistrer</button></div><div class="fit" style="padding-top:26px"><button class="btn ghost sm" id="no">Annuler</button></div></div>'
+   +'<p class="muted" style="font-size:14px;margin-top:6px">Les enquêteurs devront utiliser le nouveau code. Les fiches déjà reçues restent chez vous.</p><div id="ce" class="err"></div>';
+  $('#g2').onclick=function(){$('#nk').value=genCode()};$('#no').onclick=function(){$('#cm').textContent=''};
+  $('#sv').onclick=async function(){var k=$('#nk').value.trim();if(!VALID.test(k)){$('#ce').textContent=errMsg({code:'23514'});return}
+   try{var u=await api.updateSociete(cur.id,{code:k});cur.code=u.code;$('#cd').textContent=u.code;$('#cm').innerHTML='<span class="ok">Nouveau code enregistré. Transmettez-le à vos enquêteurs.</span>'}catch(x){$('#ce').textContent=errMsg(x)}}};
+ $('#ds').onclick=function(){
+  $('#cm').innerHTML='<p>Supprimer la société « '+esc(cur.nom)+' » ? Elle et ses fiches seront cachées pendant 30 jours, puis effacées définitivement. Son code n\'acceptera plus de fiches. Vous pouvez la restaurer depuis la corbeille.</p><div class="row"><div class="fit"><button class="btn sm" id="ok1" style="background:var(--danger)">Supprimer</button></div><div class="fit"><button class="btn ghost sm" id="no1">Annuler</button></div></div>';
   $('#no1').onclick=function(){$('#cm').textContent=''};
-  $('#ok1').onclick=async function(){try{var c=await api.newCode();societe.code=c;$('#cd').textContent=c;$('#cm').textContent='Nouveau code créé. Transmettez-le à vos enquêteurs.'}catch(x){$('#cm').textContent=x.message}}};
- async function reload(){try{await loadList(false);paint()}catch(x){$('#tb').innerHTML='<tr><td colspan="5" class="err">'+esc(x.message)+'</td></tr>'}}
+  $('#ok1').onclick=async function(){try{await api.updateSociete(cur.id,{supprimee_le:new Date().toISOString()});var n=cur.nom;try{localStorage.removeItem('soc_cur')}catch(e){}flash='Société « '+n+' » déplacée dans la corbeille pour 30 jours.';await loadSocietes()}catch(x){$('#cm').innerHTML='<span class="err">'+esc(errMsg(x))+'</span>'}}};
+ async function reload(){try{await loadList(false);paint()}catch(x){$('#tb').innerHTML='<tr><td colspan="5" class="err">'+esc(errMsg(x))+'</td></tr>'}}
  function paint(){$('#tb').innerHTML=tableRows();var v=visibleRows();$('#cnt').textContent=v.length+' fiche(s) affichée(s) sur '+total;$('#more').hidden=rows.length>=total;
   $('#tb').querySelectorAll('tr.link').forEach(function(tr){tr.onclick=function(){ficheView(tr.dataset.id)};tr.onkeydown=function(e){if(e.key==='Enter')ficheView(tr.dataset.id)}})}
  $('#ft').onchange=function(){filters.type=this.value;reload()};$('#ff').onchange=function(){filters.from=this.value;reload()};$('#fu').onchange=function(){filters.to=this.value;reload()};
@@ -190,6 +262,36 @@ async function listView(){
   saveXlsx([{name:'Fiches',aoa:d,widths:[22,30,20,28]}],'Liste_fiches_'+new Date().toISOString().slice(0,10)+'.xlsx')};
  reload()}
 
+async function trashView(){
+ app('<div class="top"><div><h1>Corbeille</h1><small>Les éléments sont effacés définitivement après 30 jours.</small></div><div class="fit"><button class="btn ghost sm" id="bk">Retour</button></div></div><p class="muted">Chargement…</p>');
+ $('#bk').onclick=backHome;
+ var tf,ts,all;try{tf=await api.corbeilleFiches();ts=await api.societes(true);soc=await api.societes()}catch(x){app('<div class="card err">'+esc(errMsg(x))+'</div><button class="btn ghost" id="bk2">Retour</button>');$('#bk2').onclick=backHome;return}
+ var names={};soc.concat(ts).forEach(function(s){names[s.id]=s.nom});var trashed={};ts.forEach(function(s){trashed[s.id]=1});
+ var h='<div class="top"><div><h1>Corbeille</h1><small>Les éléments sont effacés définitivement après 30 jours.</small></div><div class="fit"><button class="btn ghost sm" id="bk">Retour</button></div></div>';
+ h+='<div class="card"><h2>Sociétés supprimées</h2>'+(ts.length?'<div class="scroll"><table><thead><tr><th>Société</th><th>Code</th><th>Supprimée le</th><th>Reste</th><th></th></tr></thead><tbody>'
+  +ts.map(function(s){return'<tr><td>'+esc(s.nom)+'</td><td>'+esc(s.code)+'</td><td class="nowrap">'+esc(fdate(s.supprimee_le))+'</td><td class="nowrap">'+daysLeft(s.supprimee_le)+' jour(s)</td><td><button class="btn ghost sm" data-rs="'+esc(s.id)+'">Restaurer</button></td></tr>'}).join('')+'</tbody></table></div>':'<p class="muted">Aucune société supprimée.</p>')+'</div>';
+ h+='<div class="card"><h2>Fiches supprimées</h2>'+(tf.length?'<div class="scroll"><table><thead><tr><th>Supprimée le</th><th>Type</th><th>N° fiche</th><th>Société</th><th>Reste</th><th></th></tr></thead><tbody>'
+  +tf.map(function(r){var blocked=trashed[r.societe_id];return'<tr><td class="nowrap">'+esc(fdate(r.supprimee_le))+'</td><td><span class="badge">'+esc(typeName(r.type_fiche))+'</span></td><td>'+esc(r.numero_fiche||'—')+'</td><td>'+esc(names[r.societe_id]||'—')+'</td><td class="nowrap">'+daysLeft(r.supprimee_le)+' jour(s)</td><td>'+(blocked?'<span class="muted" style="font-size:13px">Restaurez d\'abord la société</span>':'<button class="btn ghost sm" data-rf="'+r.id+'">Restaurer</button>')+'</td></tr>'}).join('')+'</tbody></table></div>':'<p class="muted">Aucune fiche supprimée.</p>')+'</div><div id="tm" class="err"></div>';
+ app(h);$('#bk').onclick=backHome;
+ document.querySelectorAll('[data-rs]').forEach(function(b){b.onclick=async function(){try{await api.updateSociete(b.dataset.rs,{supprimee_le:null});trashView()}catch(x){$('#tm').textContent=errMsg(x)}}});
+ document.querySelectorAll('[data-rf]').forEach(function(b){b.onclick=async function(){try{await api.setFicheDeleted(b.dataset.rf,false);trashView()}catch(x){$('#tm').textContent=errMsg(x)}}})}
+function backHome(){if(!soc.length){newSocView(false)}else{if(!cur||!soc.some(function(s){return s.id===cur.id}))cur=soc[0];listView()}}
+
+function accountView(){
+ var em=(user&&user.email)||'';
+ app('<div class="top"><div><h1>Mon compte</h1><small>'+esc(em)+'</small></div><div class="fit"><button class="btn ghost sm" id="bk">Retour</button></div></div>'
+ +'<div class="card"><h2>Supprimer mon compte</h2><p class="muted">Votre compte, vos sociétés et leurs fiches seront cachés tout de suite. Si vous vous reconnectez dans les 30 jours, vous pourrez tout restaurer. Passé ce délai, tout est effacé définitivement. Les fiches d\'origine restent dans Kobo.</p>'
+ +'<label for="ce">Pour confirmer, saisissez votre adresse e-mail</label><input id="ce" autocomplete="off"><div class="row" style="margin-top:12px"><div class="fit"><button class="btn" id="dc" style="background:var(--danger)" disabled>Supprimer mon compte</button></div></div><div id="dm" class="err"></div></div>');
+ $('#bk').onclick=backHome;
+ $('#ce').oninput=function(){$('#dc').disabled=this.value.trim().toLowerCase()!==em.toLowerCase()};
+ $('#dc').onclick=async function(){try{await api.supprimerCompte();restoreView(new Date().toISOString())}catch(x){$('#dm').textContent=errMsg(x)}}}
+function restoreView(d){
+ var end=new Date(new Date(d).getTime()+30*864e5).toLocaleDateString('fr-FR',{dateStyle:'long'});
+ app('<div style="max-width:520px;margin:40px auto"><div class="card"><h2>Votre compte est en cours de suppression</h2><p>Il sera effacé définitivement le <strong>'+esc(end)+'</strong>, avec vos sociétés et leurs fiches. D\'ici là, vous pouvez tout restaurer.</p>'
+ +'<div class="row"><div class="fit"><button class="btn" id="rc">Restaurer mon compte</button></div><div class="fit"><button class="btn ghost" id="lo">'+(DEMO?'Démo':'Se déconnecter')+'</button></div></div><div id="rm" class="err"></div></div></div>');
+ $('#lo').onclick=logout;
+ $('#rc').onclick=async function(){try{await api.restaurerCompte();await loadSocietes()}catch(x){$('#rm').textContent=errMsg(x)}}}
+
 async function ficheView(id){
  app('<p class="muted" style="padding:40px 0">Chargement de la fiche…</p>');
  var f;try{f=await api.fiche(id)}catch(x){app('<div class="card err">'+esc(x.message)+'</div><button class="btn ghost" id="bk">Retour</button>');$('#bk').onclick=listView;return}
@@ -198,7 +300,7 @@ async function ficheView(id){
  var secs=st.sections.map(function(s){var a=section(s,data,st.choices);return{s:s,a:a,n:a.qa.length+a.tables.reduce(function(t,x){return t+x.rows.length},0)}});
  var cur=Math.max(0,secs.findIndex(function(x,i){return x.n>0&&i>0}));
  var head='<div class="top"><div><h1>'+esc(st.title)+'</h1><small>N° '+esc(f.numero_fiche||'—')+' · '+esc(f.site||'site non précisé')+' · reçue le '+esc(fdate(f.soumise_le))+'</small></div>'
-  +'<div class="row" style="flex:0 0 auto"><button class="btn ghost sm fit" id="bk">Retour à la liste</button><button class="btn sm fit" id="dl">Télécharger en Excel</button></div></div>';
+  +'<div class="row" style="flex:0 0 auto"><button class="btn ghost sm fit" id="bk">Retour à la liste</button><button class="btn sm fit" id="dl">Télécharger en Excel</button><button class="btn ghost sm fit" id="rm">Supprimer la fiche</button></div></div>';
  function body(){var x=secs[cur],h='<div class="card"><h2>'+esc(secTitle(x.s))+'</h2>';
   if(!x.n)h+='<p class="muted">Aucune réponse dans cette section.</p>';
   h+=x.a.qa.map(function(p){return'<div class="qa"><div class="q">'+esc(p[0])+'</div><div class="a">'+esc(p[1])+'</div></div>'}).join('');
@@ -207,10 +309,13 @@ async function ficheView(id){
   return h+'</div>'}
  function paint(){$('#nv').innerHTML=secs.map(function(x,i){return'<button data-i="'+i+'" class="'+(i===cur?'on':'')+'"><span>'+esc(secTitle(x.s).slice(0,48))+'</span><span class="n">'+(x.n||'')+'</span></button>'}).join('');
   $('#bd').innerHTML=body();$('#nv').querySelectorAll('button').forEach(function(b){b.onclick=function(){cur=+b.dataset.i;paint();window.scrollTo(0,0)}})}
- app(head+'<div class="layout"><nav class="card nav" id="nv" aria-label="Sections"></nav><div id="bd"></div></div>');paint();
+ app(head+'<div id="rmc"></div><div class="layout"><nav class="card nav" id="nv" aria-label="Sections"></nav><div id="bd"></div></div>');paint();
  $('#bk').onclick=listView;
+ $('#rm').onclick=function(){$('#rmc').innerHTML='<div class="card"><p>Supprimer cette fiche ? Elle sera cachée pendant 30 jours, puis effacée définitivement. Vous pouvez la restaurer depuis la corbeille.</p><div class="row"><div class="fit"><button class="btn sm" id="ok1" style="background:var(--danger)">Supprimer</button></div><div class="fit"><button class="btn ghost sm" id="no1">Annuler</button></div></div><div id="re" class="err"></div></div>';
+  $('#no1').onclick=function(){$('#rmc').innerHTML=''};
+  $('#ok1').onclick=async function(){try{await api.setFicheDeleted(f.id,true);flash='Fiche déplacée dans la corbeille pour 30 jours.';listView()}catch(x){$('#re').textContent=errMsg(x)}}};
  $('#dl').onclick=function(){
-  var meta=[['Type de fiche',st.title],['N° fiche',f.numero_fiche||''],['Site',f.site||''],['Date de soumission',fdate(f.soumise_le)],['Société',societe?societe.nom:'']];
+  var meta=[['Type de fiche',st.title],['N° fiche',f.numero_fiche||''],['Site',f.site||''],['Date de soumission',fdate(f.soumise_le)],['Société',cur?cur.nom:'']];
   var sheets=[{name:'Fiche',aoa:meta,widths:[26,50]}],used={Fiche:1};
   secs.forEach(function(x){if(!x.n)return;var aoa=[[secTitle(x.s)],[],['Question','Réponse']].concat(x.a.qa);
    x.a.tables.forEach(function(t){aoa.push([]);aoa.push([t.label]);aoa.push(t.cols);t.rows.forEach(function(r){aoa.push(r)})});
@@ -223,22 +328,23 @@ function saveXlsx(sheets,name){var wb=XLSX.utils.book_new();
  XLSX.writeFile(wb,name)}
 
 /* ---------- Démarrage ---------- */
-async function route(session){
+async function afterLogin(session){
  if(!session){authView('in');return}
  user=session.user;
- try{societe=await api.societe();if(!societe)setupView();else{filters={type:'',from:'',to:'',text:''};listView()}}catch(x){app('<div class="card err">'+esc(x.message)+'</div>')}}
+ try{var st=await api.statutCompte();if(st){restoreView(st.supprime_le);return}await loadSocietes()}
+ catch(x){app('<div class="card err">'+esc(errMsg(x))+'</div>')}}
 (async function(){
  try{S=await (await fetch('structure.json')).json()}catch(e){app('<div class="card err">Impossible de charger la structure des fiches.</div>');return}
- if(DEMO){$('#demoBar').hidden=false;societe=await api.societe();listView();return}
+ if(DEMO){$('#demoBar').hidden=false;user={email:'demo@exemple.org'};await afterLogin({user:user});return}
  sb=supabase.createClient(CFG.SUPABASE_URL,CFG.SUPABASE_ANON_KEY,{auth:{persistSession:true,autoRefreshToken:true,detectSessionInUrl:true,storageKey:'fiches-auth'}});
  var started=false;
  sb.auth.onAuthStateChange(function(ev,s){
   setTimeout(function(){ // différé : ne pas appeler la base à l'intérieur de l'écouteur
-   if(ev==='INITIAL_SESSION'){started=true;route(s)}
-   else if(ev==='SIGNED_IN'){started=true;if(!user||(s&&s.user.id!==user.id))route(s)}
-   else if(ev==='SIGNED_OUT'){user=null;societe=null;route(null)}
+   if(ev==='INITIAL_SESSION'){started=true;afterLogin(s)}
+   else if(ev==='SIGNED_IN'){started=true;if(!user||(s&&s.user.id!==user.id))afterLogin(s)}
+   else if(ev==='SIGNED_OUT'){user=null;soc=[];cur=null;authView('in')}
   },0)});
- setTimeout(async function(){if(started)return;var r=await sb.auth.getSession();if(!started){started=true;route(r.data.session)}},1500);
+ setTimeout(async function(){if(started)return;var r=await sb.auth.getSession();if(!started){started=true;afterLogin(r.data.session)}},1500);
 })();
 </script>
 </body>
