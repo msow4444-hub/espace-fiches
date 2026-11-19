@@ -230,9 +230,15 @@ async function route(session){
 (async function(){
  try{S=await (await fetch('structure.json')).json()}catch(e){app('<div class="card err">Impossible de charger la structure des fiches.</div>');return}
  if(DEMO){$('#demoBar').hidden=false;societe=await api.societe();listView();return}
- sb=supabase.createClient(CFG.SUPABASE_URL,CFG.SUPABASE_ANON_KEY);
- var r=await sb.auth.getSession();route(r.data.session);
- sb.auth.onAuthStateChange(function(ev,s){if(ev==='SIGNED_IN'&&user&&s&&s.user.id===user.id)return;if(ev==='SIGNED_IN'||ev==='SIGNED_OUT')route(s)});
+ sb=supabase.createClient(CFG.SUPABASE_URL,CFG.SUPABASE_ANON_KEY,{auth:{persistSession:true,autoRefreshToken:true,detectSessionInUrl:true,storageKey:'fiches-auth'}});
+ var started=false;
+ sb.auth.onAuthStateChange(function(ev,s){
+  setTimeout(function(){ // différé : ne pas appeler la base à l'intérieur de l'écouteur
+   if(ev==='INITIAL_SESSION'){started=true;route(s)}
+   else if(ev==='SIGNED_IN'){started=true;if(!user||(s&&s.user.id!==user.id))route(s)}
+   else if(ev==='SIGNED_OUT'){user=null;societe=null;route(null)}
+  },0)});
+ setTimeout(async function(){if(started)return;var r=await sb.auth.getSession();if(!started){started=true;route(r.data.session)}},1500);
 })();
 </script>
 </body>
