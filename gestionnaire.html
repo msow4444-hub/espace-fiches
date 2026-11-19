@@ -1,0 +1,245 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Espace gestionnaire · Fiches d'enquête</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Space+Grotesk:wght@500;600;700&display=swap">
+<style>
+:root{
+  --bg:#f3f6fa; --surface:#fff; --ink:#14202e; --muted:#55667a; --line:#d3dde8;
+  --accent:#1f4e78; --accent-ink:#fff; --accent-soft:#ddebf7; --warn:#9a5b0f; --danger:#a12a2a;
+  --s1:#1f4e78; --s2:#4a7fb0; --s3:#9dc3e6; --s4:#e8c766; --s5:#b38b2e;
+  --fd:'Space Grotesk',system-ui,sans-serif; --fb:'Inter',system-ui,sans-serif;
+  color-scheme:light;
+}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){
+  --bg:#0f1822; --surface:#162230; --ink:#e6edf5; --muted:#9fb1c6; --line:#27394d;
+  --accent:#7fb2e0; --accent-ink:#0a1b2b; --accent-soft:#1c3249; --warn:#e0a550; --danger:#ef8c8c;
+  --s1:#7fb2e0; --s2:#4a7fb0; --s3:#2b4f73; --s4:#c9a35e; --s5:#8a6a3a; color-scheme:dark}}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.55 var(--fb)}
+.strata{display:flex;height:10px}.strata i{display:block}
+.strata i:nth-child(1){flex:5;background:var(--s1)}.strata i:nth-child(2){flex:3;background:var(--s2)}
+.strata i:nth-child(3){flex:4;background:var(--s3)}.strata i:nth-child(4){flex:2;background:var(--s4)}.strata i:nth-child(5){flex:3;background:var(--s5)}
+.wrap{max-width:1040px;margin:0 auto;padding:0 16px}
+.top{display:flex;gap:16px;align-items:center;justify-content:space-between;flex-wrap:wrap;padding:20px 0}
+.top h1{font:700 22px var(--fd);margin:0}
+.top small{color:var(--muted);display:block;font-size:13px}
+.card{background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:20px;margin-bottom:16px;min-width:0}
+h2{font:600 18px var(--fd);margin:0 0 8px}
+h3{font:600 16px var(--fd);margin:24px 0 8px}
+p{margin:0 0 10px}.muted{color:var(--muted)}
+label{display:block;font-size:13px;font-weight:600;color:var(--muted);margin:12px 0 4px;letter-spacing:.02em}
+input,select{font:inherit;width:100%;padding:10px 12px;border:1.5px solid var(--line);border-radius:8px;background:var(--bg);color:var(--ink)}
+input:focus-visible,select:focus-visible,button:focus-visible,a:focus-visible{outline:3px solid var(--accent-soft);outline-offset:1px;border-color:var(--accent)}
+.btn{font:600 15px var(--fb);padding:10px 16px;border-radius:8px;border:0;background:var(--accent);color:var(--accent-ink);cursor:pointer}
+.btn.ghost{background:transparent;color:var(--accent);border:1.5px solid var(--line)}
+.btn.sm{padding:6px 12px;font-size:14px}
+.btn:disabled{opacity:.5;cursor:default}
+.row{display:flex;gap:12px;flex-wrap:wrap;align-items:flex-end}.row>*{flex:1 1 160px;min-width:0}.row>.fit{flex:0 0 auto}
+.err{color:var(--danger);font-size:14px;margin-top:8px}.ok{color:var(--accent);font-size:14px;margin-top:8px}
+.tabs{display:flex;gap:8px;margin-bottom:8px}
+.tabs button{flex:1;padding:10px;border:1.5px solid var(--line);background:transparent;color:var(--muted);border-radius:8px;font:600 15px var(--fb);cursor:pointer}
+.tabs button.on{background:var(--accent-soft);color:var(--accent);border-color:var(--accent)}
+.code{font:600 22px var(--fd);letter-spacing:.12em;background:var(--accent-soft);color:var(--accent);padding:6px 14px;border-radius:8px;display:inline-block}
+.scroll{overflow-x:auto}
+table{border-collapse:collapse;width:100%;font-size:14px}
+th,td{padding:9px 12px;text-align:left;border-bottom:1px solid var(--line);vertical-align:top}
+th{font-size:12px;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);white-space:nowrap}
+tbody tr.link{cursor:pointer}tbody tr.link:hover{background:var(--accent-soft)}
+td.nowrap{white-space:nowrap}
+.badge{display:inline-block;font-size:12px;font-weight:600;padding:2px 10px;border-radius:99px;background:var(--accent-soft);color:var(--accent);white-space:nowrap}
+.layout{display:grid;grid-template-columns:260px minmax(0,1fr);gap:16px;align-items:start}
+.nav{position:sticky;top:8px;display:flex;flex-direction:column;gap:4px;max-height:80vh;overflow:auto}
+.nav button{text-align:left;padding:8px 10px;border:0;background:transparent;border-radius:8px;color:var(--ink);font:500 14px var(--fb);cursor:pointer;display:flex;justify-content:space-between;gap:8px}
+.nav button.on{background:var(--accent-soft);color:var(--accent);font-weight:600}
+.nav button span.n{color:var(--muted);font-weight:400}
+.qa{display:grid;grid-template-columns:minmax(0,5fr) minmax(0,4fr);gap:4px 20px;padding:9px 0;border-bottom:1px solid var(--line)}
+.qa:last-child{border:0}.qa .q{color:var(--muted);font-size:14px}.qa .a{font-weight:500;overflow-wrap:anywhere}
+.demo{background:var(--accent-soft);color:var(--accent);padding:8px 16px;font-size:14px;text-align:center}
+@media (max-width:760px){.layout{grid-template-columns:1fr}.nav{position:static;flex-direction:row;overflow-x:auto;max-height:none}.nav button{white-space:nowrap}.qa{grid-template-columns:1fr}}
+</style>
+</head>
+<body>
+<div class="strata" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i></div>
+<div id="demoBar" class="demo" hidden>Mode démonstration : données d'exemple, aucune connexion.</div>
+<div class="wrap" id="app"><p class="muted" style="padding:40px 0">Chargement…</p></div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script src="config.js"></script>
+<script>
+var CFG=window.CONFIG||{};
+var DEMO=!CFG.SUPABASE_URL||location.hash==='#demo';
+var S=null,sb=null,societe=null,user=null,filters={type:'',from:'',to:'',text:''},rows=[],total=0,PAGE=50;
+var $=function(s){return document.querySelector(s)};
+function esc(s){return String(s==null?'':s).replace(/[&<>"']/g,function(c){return{'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]})}
+function fdate(v){if(!v)return'';var d=new Date(v);return isNaN(d)?String(v):d.toLocaleString('fr-FR',{dateStyle:'medium',timeStyle:'short'})}
+function typeName(u){return S[u]?S[u].title:'Type inconnu'}
+function app(h){$('#app').innerHTML=h}
+
+/* ---------- Accès aux données (réel ou démo) ---------- */
+var DEMO_ROWS=[
+ {id:3,type_fiche:'ahm2fHGsKsTpU58MApoiB4',numero_fiche:'R-014/11/2026',site:null,soumise_le:'2026-11-17T16:20:00Z',donnees:{'p00_etape1/entete_societe':'Société test','p01_a_identification/a_numero_fiche':'R-014/11/2026'}},
+ {id:2,type_fiche:'anVthKYbRWT62fEKEv84C7',numero_fiche:'E-007/11/2026',site:'Carrière de Mbour',soumise_le:'2026-11-12T09:05:00Z',donnees:{'p00_etape1/entete_societe':'Société test','p00_etape1/entete_site':'Carrière de Mbour','p01_a_identification/a_numero_fiche':'E-007/11/2026'}},
+ {id:1,type_fiche:'aiDFEjzPbb9XhQtxHMkEvp',numero_fiche:'F-100/11/2026',site:'Site de Kédougou',soumise_le:'2026-11-18T10:46:48Z',donnees:{
+  code_societe:'A4159990','p00_etape1/titre':'petite_mine','p00_etape1/entete_societe':'Société test','p00_etape1/entete_site':'Site de Kédougou',
+  'p01_a_identification/a_numero_fiche':'F-100/11/2026','p03_c_gps/c_mode':'manuel',
+  'p03_c_gps/c_points':[
+   {'p03_c_gps/c_points/c_date':'2026-11-18','p03_c_gps/c_points/c_appareil':'Garmin','p03_c_gps/c_points/c_point_num':'-001'},
+   {'p03_c_gps/c_points/c_date':'2026-11-18','p03_c_gps/c_points/c_appareil':'Téléphone','p03_c_gps/c_points/c_point_num':'-002'}]}}
+];
+var api={
+ async societe(){ if(DEMO)return{id:'demo',nom:'Société test',code:'A4159990'};
+   var r=await sb.from('societes').select('*').limit(1);if(r.error)throw r.error;return r.data[0]||null},
+ async createSociete(nom){ var r=await sb.from('societes').insert({nom:nom}).select().single();if(r.error)throw r.error;return r.data},
+ async newCode(){ var a='ABCDEFGHJKLMNPQRSTUVWXYZ23456789',b=new Uint8Array(8);crypto.getRandomValues(b);
+   var c=Array.from(b,function(x){return a[x%a.length]}).join('');
+   if(DEMO){societe.code=c;return c}
+   var r=await sb.from('societes').update({code:c}).eq('id',societe.id).select().single();if(r.error)throw r.error;return r.data.code},
+ async list(f,from){ if(DEMO){var l=DEMO_ROWS.filter(function(r){return(!f.type||r.type_fiche===f.type)&&(!f.from||r.soumise_le.slice(0,10)>=f.from)&&(!f.to||r.soumise_le.slice(0,10)<=f.to)});
+     return{data:l.slice(from,from+PAGE),count:l.length}}
+   var q=sb.from('fiches').select('id,type_fiche,numero_fiche,site,soumise_le',{count:'exact'}).order('soumise_le',{ascending:false}).range(from,from+PAGE-1);
+   if(f.type)q=q.eq('type_fiche',f.type);if(f.from)q=q.gte('soumise_le',f.from);if(f.to)q=q.lte('soumise_le',f.to+'T23:59:59');
+   var r=await q;if(r.error)throw r.error;return r},
+ async fiche(id){ if(DEMO)return DEMO_ROWS.find(function(r){return r.id==id});
+   var r=await sb.from('fiches').select('*').eq('id',id).single();if(r.error)throw r.error;return r.data}
+};
+
+/* ---------- Lecture d'une fiche selon la structure du formulaire ---------- */
+function fmt(it,v,ch){
+  if(v==null||v==='')return null;
+  var L=(ch&&it.list&&ch[it.list])||{};
+  if(it.type==='select_one')return L[v]||v;
+  if(it.type==='select_multiple')return String(v).split(' ').filter(Boolean).map(function(x){return L[x]||x}).join(', ');
+  if(it.type==='date'&&/^\d{4}-\d{2}-\d{2}/.test(v))return v.slice(8,10)+'/'+v.slice(5,7)+'/'+v.slice(0,4);
+  return String(v)}
+function flatQ(node,path,out){ // questions d'un tableau répété (groupes inclus)
+  node.items.forEach(function(it){
+    if(it.kind==='group')flatQ(it,path+it.name+'/',out);
+    else if(it.kind==='q'&&it.type!=='calculate'&&it.type!=='begin_repeat')out.push({it:it,key:path+it.name});});
+  return out}
+function collect(node,path,data,ch,acc){
+  node.items.forEach(function(it){
+    if(it.kind==='group')collect(it,path+it.name+'/',data,ch,acc);
+    else if(it.kind==='repeat'){
+      var arr=data[path+it.name];if(!Array.isArray(arr)||!arr.length)return;
+      var cols=flatQ(it,path+it.name+'/',[]),body=arr.map(function(el){return cols.map(function(c){return fmt(c.it,el[c.key],ch)||''})});
+      var keep=cols.map(function(c,i){return body.some(function(r){return r[i]!==''})});
+      var cl=cols.filter(function(c,i){return keep[i]}).map(function(c){return c.it.label||c.it.name});
+      var br=body.map(function(r){return r.filter(function(v,i){return keep[i]})});
+      if(cl.length)acc.tables.push({label:it.label||it.name,cols:cl,rows:br});}
+    else if(it.kind==='q'&&it.type!=='calculate'){
+      var v=fmt(it,data[path+it.name],ch);if(v!==null)acc.qa.push([it.label||it.name,v]);}});
+  return acc}
+function section(sec,data,ch){var a=collect(sec,sec.name+'/',data,ch,{qa:[],tables:[]});return a}
+function secTitle(s){return s.label.replace(/^Étape 1.*/,'En-tête')}
+
+/* ---------- Écrans ---------- */
+function authView(mode,msg){
+ app('<div style="max-width:440px;margin:40px auto"><div class="card"><h2>Espace gestionnaire</h2><p class="muted">Consultez les fiches d\'enquête de votre société.</p>'
+ +'<div class="tabs"><button id="tIn" class="'+(mode==='in'?'on':'')+'">Connexion</button><button id="tUp" class="'+(mode==='up'?'on':'')+'">Créer un compte</button></div>'
+ +'<form id="af"><label for="em">Adresse e-mail</label><input id="em" type="email" autocomplete="email" required>'
+ +'<label for="pw">Mot de passe</label><input id="pw" type="password" minlength="8" autocomplete="'+(mode==='in'?'current-password':'new-password')+'" required>'
+ +'<p class="muted" style="font-size:13px;margin-top:6px">'+(mode==='up'?'8 caractères minimum.':'')+'</p>'
+ +'<button class="btn" style="width:100%;margin-top:6px">'+(mode==='in'?'Se connecter':'Créer mon compte')+'</button><div id="am" class="'+(msg&&msg.ok?'ok':'err')+'">'+esc(msg?msg.t:'')+'</div></form></div></div>');
+ $('#tIn').onclick=function(){authView('in')};$('#tUp').onclick=function(){authView('up')};
+ $('#af').onsubmit=async function(e){e.preventDefault();var em=$('#em').value.trim(),pw=$('#pw').value;$('#am').textContent='';
+  try{
+   if(mode==='in'){var r=await sb.auth.signInWithPassword({email:em,password:pw});if(r.error)throw r.error;}
+   else{var r=await sb.auth.signUp({email:em,password:pw,options:{emailRedirectTo:location.origin+location.pathname}});if(r.error)throw r.error;
+     if(!r.data.session){authView('in',{ok:true,t:'Compte créé. Ouvrez le lien reçu par e-mail pour le confirmer, puis connectez-vous.'});}}
+  }catch(x){$('#am').className='err';$('#am').textContent=/Invalid login/i.test(x.message)?'E-mail ou mot de passe incorrect.':/not confirmed/i.test(x.message)?'Adresse e-mail pas encore confirmée.':x.message}}}
+
+function setupView(){
+ app('<div style="max-width:440px;margin:40px auto"><div class="card"><h2>Votre société</h2><p class="muted">Donnez le nom de votre société. Un code secret sera créé pour vos enquêteurs.</p>'
+ +'<form id="sf"><label for="sn">Nom de la société</label><input id="sn" required maxlength="80"><button class="btn" style="margin-top:12px">Créer</button><div id="sm" class="err"></div></form>'
+ +'<p style="margin-top:16px"><button class="btn ghost sm" id="lo">Se déconnecter</button></p></div></div>');
+ $('#lo').onclick=function(){sb.auth.signOut()};
+ $('#sf').onsubmit=async function(e){e.preventDefault();try{societe=await api.createSociete($('#sn').value.trim());listView()}catch(x){$('#sm').textContent=x.message}}}
+
+async function loadList(append){
+ var r=await api.list(filters,append?rows.length:0);rows=append?rows.concat(r.data):r.data;total=r.count==null?rows.length:r.count}
+function visibleRows(){var t=filters.text.toLowerCase();return rows.filter(function(r){return!t||((r.site||'')+' '+(r.numero_fiche||'')).toLowerCase().indexOf(t)>-1})}
+function tableRows(){var v=visibleRows();if(!v.length)return'<tr><td colspan="5" class="muted">Aucune fiche pour ces critères.</td></tr>';
+ return v.map(function(r){return'<tr class="link" data-id="'+r.id+'" tabindex="0"><td class="nowrap">'+esc(fdate(r.soumise_le))+'</td><td><span class="badge">'+esc(typeName(r.type_fiche))+'</span></td><td>'+esc(r.numero_fiche||'—')+'</td><td>'+esc(r.site||'—')+'</td><td><button class="btn ghost sm">Ouvrir</button></td></tr>'}).join('')}
+async function listView(){
+ var opts='<option value="">Tous les types</option>'+Object.keys(S).map(function(u){return'<option value="'+u+'"'+(filters.type===u?' selected':'')+'>'+esc(S[u].title)+'</option>'}).join('');
+ app('<div class="top"><div><h1>'+esc(societe.nom)+'</h1><small>Espace gestionnaire</small></div><button class="btn ghost sm" id="lo">'+(DEMO?'Démo':'Se déconnecter')+'</button></div>'
+ +'<div class="card"><h2>Code de votre société</h2><p class="muted">Donnez ce code à vos enquêteurs : ils le saisissent sur la page d\'accueil avant de remplir une fiche.</p>'
+ +'<div class="row" style="align-items:center"><div class="fit"><span class="code" id="cd">'+esc(societe.code)+'</span></div><div class="fit"><button class="btn ghost sm" id="cp">Copier</button></div>'
+ +'<div class="fit"><button class="btn ghost sm" id="nc">Changer le code</button></div></div><div id="cm" class="muted" style="font-size:14px;margin-top:8px"></div></div>'
+ +'<div class="card"><h2>Fiches reçues</h2><div class="row"><div><label for="ft">Type de fiche</label><select id="ft">'+opts+'</select></div>'
+ +'<div><label for="ff">Du</label><input id="ff" type="date" value="'+filters.from+'"></div><div><label for="fu">Au</label><input id="fu" type="date" value="'+filters.to+'"></div>'
+ +'<div><label for="fx">Site ou numéro</label><input id="fx" value="'+esc(filters.text)+'" placeholder="Rechercher"></div></div>'
+ +'<div class="scroll" style="margin-top:12px"><table><thead><tr><th>Date</th><th>Type</th><th>N° fiche</th><th>Site</th><th></th></tr></thead><tbody id="tb"><tr><td colspan="5" class="muted">Chargement…</td></tr></tbody></table></div>'
+ +'<div class="row" style="margin-top:12px;align-items:center"><div id="cnt" class="muted" style="font-size:14px"></div><div class="fit"><button class="btn ghost sm" id="more" hidden>Voir plus</button></div><div class="fit"><button class="btn sm" id="xl">Exporter la liste (Excel)</button></div></div></div>');
+ $('#lo').onclick=function(){if(!DEMO)sb.auth.signOut()};
+ $('#cp').onclick=async function(){try{await navigator.clipboard.writeText(societe.code);$('#cm').textContent='Code copié.'}catch(e){$('#cm').textContent='Sélectionnez le code et copiez-le.'}};
+ $('#nc').onclick=function(){$('#cm').innerHTML='Les enquêteurs devront utiliser le nouveau code. Les fiches déjà reçues restent chez vous. <button class="btn sm" id="ok1">Confirmer</button> <button class="btn ghost sm" id="no1">Annuler</button>';
+  $('#no1').onclick=function(){$('#cm').textContent=''};
+  $('#ok1').onclick=async function(){try{var c=await api.newCode();societe.code=c;$('#cd').textContent=c;$('#cm').textContent='Nouveau code créé. Transmettez-le à vos enquêteurs.'}catch(x){$('#cm').textContent=x.message}}};
+ async function reload(){try{await loadList(false);paint()}catch(x){$('#tb').innerHTML='<tr><td colspan="5" class="err">'+esc(x.message)+'</td></tr>'}}
+ function paint(){$('#tb').innerHTML=tableRows();var v=visibleRows();$('#cnt').textContent=v.length+' fiche(s) affichée(s) sur '+total;$('#more').hidden=rows.length>=total;
+  $('#tb').querySelectorAll('tr.link').forEach(function(tr){tr.onclick=function(){ficheView(tr.dataset.id)};tr.onkeydown=function(e){if(e.key==='Enter')ficheView(tr.dataset.id)}})}
+ $('#ft').onchange=function(){filters.type=this.value;reload()};$('#ff').onchange=function(){filters.from=this.value;reload()};$('#fu').onchange=function(){filters.to=this.value;reload()};
+ $('#fx').oninput=function(){filters.text=this.value;paint()};
+ $('#more').onclick=async function(){await loadList(true);paint()};
+ $('#xl').onclick=function(){var d=[['Date','Type de fiche','N° fiche','Site']].concat(visibleRows().map(function(r){return[fdate(r.soumise_le),typeName(r.type_fiche),r.numero_fiche||'',r.site||'']}));
+  saveXlsx([{name:'Fiches',aoa:d,widths:[22,30,20,28]}],'Liste_fiches_'+new Date().toISOString().slice(0,10)+'.xlsx')};
+ reload()}
+
+async function ficheView(id){
+ app('<p class="muted" style="padding:40px 0">Chargement de la fiche…</p>');
+ var f;try{f=await api.fiche(id)}catch(x){app('<div class="card err">'+esc(x.message)+'</div><button class="btn ghost" id="bk">Retour</button>');$('#bk').onclick=listView;return}
+ var st=S[f.type_fiche],data=f.donnees||{};
+ if(!st){app('<div class="card"><h2>Type de fiche inconnu</h2><p class="muted">'+esc(f.type_fiche)+'</p></div><button class="btn ghost" id="bk">Retour</button>');$('#bk').onclick=listView;return}
+ var secs=st.sections.map(function(s){var a=section(s,data,st.choices);return{s:s,a:a,n:a.qa.length+a.tables.reduce(function(t,x){return t+x.rows.length},0)}});
+ var cur=Math.max(0,secs.findIndex(function(x,i){return x.n>0&&i>0}));
+ var head='<div class="top"><div><h1>'+esc(st.title)+'</h1><small>N° '+esc(f.numero_fiche||'—')+' · '+esc(f.site||'site non précisé')+' · reçue le '+esc(fdate(f.soumise_le))+'</small></div>'
+  +'<div class="row" style="flex:0 0 auto"><button class="btn ghost sm fit" id="bk">Retour à la liste</button><button class="btn sm fit" id="dl">Télécharger en Excel</button></div></div>';
+ function body(){var x=secs[cur],h='<div class="card"><h2>'+esc(secTitle(x.s))+'</h2>';
+  if(!x.n)h+='<p class="muted">Aucune réponse dans cette section.</p>';
+  h+=x.a.qa.map(function(p){return'<div class="qa"><div class="q">'+esc(p[0])+'</div><div class="a">'+esc(p[1])+'</div></div>'}).join('');
+  x.a.tables.forEach(function(t){h+='<h3>'+esc(t.label)+'</h3><div class="scroll"><table><thead><tr>'+t.cols.map(function(c){return'<th>'+esc(c)+'</th>'}).join('')+'</tr></thead><tbody>'
+    +t.rows.map(function(r){return'<tr>'+r.map(function(v){return'<td>'+esc(v)+'</td>'}).join('')+'</tr>'}).join('')+'</tbody></table></div>'});
+  return h+'</div>'}
+ function paint(){$('#nv').innerHTML=secs.map(function(x,i){return'<button data-i="'+i+'" class="'+(i===cur?'on':'')+'"><span>'+esc(secTitle(x.s).slice(0,48))+'</span><span class="n">'+(x.n||'')+'</span></button>'}).join('');
+  $('#bd').innerHTML=body();$('#nv').querySelectorAll('button').forEach(function(b){b.onclick=function(){cur=+b.dataset.i;paint();window.scrollTo(0,0)}})}
+ app(head+'<div class="layout"><nav class="card nav" id="nv" aria-label="Sections"></nav><div id="bd"></div></div>');paint();
+ $('#bk').onclick=listView;
+ $('#dl').onclick=function(){
+  var meta=[['Type de fiche',st.title],['N° fiche',f.numero_fiche||''],['Site',f.site||''],['Date de soumission',fdate(f.soumise_le)],['Société',societe?societe.nom:'']];
+  var sheets=[{name:'Fiche',aoa:meta,widths:[26,50]}],used={Fiche:1};
+  secs.forEach(function(x){if(!x.n)return;var aoa=[[secTitle(x.s)],[],['Question','Réponse']].concat(x.a.qa);
+   x.a.tables.forEach(function(t){aoa.push([]);aoa.push([t.label]);aoa.push(t.cols);t.rows.forEach(function(r){aoa.push(r)})});
+   var nm=secTitle(x.s).replace(/[\[\]:*?\/\\]/g,'').slice(0,28).trim()||'Section',k=nm,i=2;while(used[k])k=nm.slice(0,26)+' '+i++;used[k]=1;
+   sheets.push({name:k,aoa:aoa,widths:[60,40,30,30,30,30]})});
+  saveXlsx(sheets,('Fiche_'+st.title+'_'+(f.numero_fiche||f.id)+'.xlsx').replace(/[\/\\:*?"<>|\s]+/g,'_'))}}
+
+function saveXlsx(sheets,name){var wb=XLSX.utils.book_new();
+ sheets.forEach(function(s){var ws=XLSX.utils.aoa_to_sheet(s.aoa);ws['!cols']=(s.widths||[]).map(function(w){return{wch:w}});XLSX.utils.book_append_sheet(wb,ws,s.name)});
+ XLSX.writeFile(wb,name)}
+
+/* ---------- Démarrage ---------- */
+async function route(session){
+ if(!session){authView('in');return}
+ user=session.user;
+ try{societe=await api.societe();if(!societe)setupView();else{filters={type:'',from:'',to:'',text:''};listView()}}catch(x){app('<div class="card err">'+esc(x.message)+'</div>')}}
+(async function(){
+ try{S=await (await fetch('structure.json')).json()}catch(e){app('<div class="card err">Impossible de charger la structure des fiches.</div>');return}
+ if(DEMO){$('#demoBar').hidden=false;societe=await api.societe();listView();return}
+ sb=supabase.createClient(CFG.SUPABASE_URL,CFG.SUPABASE_ANON_KEY,{auth:{persistSession:true,autoRefreshToken:true,detectSessionInUrl:true,storageKey:'fiches-auth'}});
+ var started=false;
+ sb.auth.onAuthStateChange(function(ev,s){
+  setTimeout(function(){ // différé : ne pas appeler la base à l'intérieur de l'écouteur
+   if(ev==='INITIAL_SESSION'){started=true;route(s)}
+   else if(ev==='SIGNED_IN'){started=true;if(!user||(s&&s.user.id!==user.id))route(s)}
+   else if(ev==='SIGNED_OUT'){user=null;societe=null;route(null)}
+  },0)});
+ setTimeout(async function(){if(started)return;var r=await sb.auth.getSession();if(!started){started=true;route(r.data.session)}},1500);
+})();
+</script>
+</body>
+</html>
