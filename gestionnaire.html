@@ -65,6 +65,16 @@ td.nowrap{white-space:nowrap}
 .eye{position:absolute;right:6px;top:50%;transform:translateY(-50%);border:0;background:transparent;color:var(--muted);cursor:pointer;padding:6px;border-radius:6px;display:flex}
 .eye:hover{color:var(--accent)}
 .card.ok{font-size:15px}
+.big{font:700 clamp(28px,5vw,40px)/1.15 var(--fd);margin:16px 0 8px;letter-spacing:-.01em}
+.stabs{display:flex;gap:2px;overflow-x:auto;border-bottom:1px solid var(--line);margin:8px 0 24px;scrollbar-width:thin}
+.stabs button{flex:0 0 auto;border:0;background:transparent;padding:11px 14px;font:500 15px var(--fb);color:var(--muted);cursor:pointer;border-bottom:2px solid transparent;margin-bottom:-1px;white-space:nowrap}
+.stabs button:hover{color:var(--ink)}
+.stabs button.on{color:var(--accent);border-bottom-color:var(--accent);font-weight:600}
+.stitle{font:700 26px/1.2 var(--fd);margin:0 0 16px}
+.part{font:600 16px var(--fd);margin:28px 0 8px;color:var(--accent)}
+table.qt td.q{color:var(--muted);width:55%}
+.chk{display:flex;gap:10px;align-items:center;margin:16px 0 0;font-size:15px;font-weight:400;color:var(--ink);letter-spacing:0}
+.chk input{width:auto}
 </style>
 </head>
 <body>
@@ -292,30 +302,56 @@ function restoreView(d){
  $('#lo').onclick=logout;
  $('#rc').onclick=async function(){try{await api.restaurerCompte();await loadSocietes()}catch(x){$('#rm').textContent=errMsg(x)}}}
 
+var TAB_PM={p01_a_identification:'A - Identification',p02_b_limites:'B - Limites du titre',p03_c_gps:'C - Localisation GPS',p04_d_extraction:'D - Extraction et géologie',p05_e_materiel:'E - Matériel et énergie',p06_f_personnel:'F - Personnel',p07_g_hse:'G - Hygiène santé sécurité',p08_h_environnement:'H - Environnement',p09_i_communaute:'I - Communauté',p10_j_visites:'J - Visites et documents',p11_k_difficultes:'K - Difficultés et besoins',p12_resume:'Résumé et vérification'};
+function tabLabel(uid,sec){
+ if(sec.name==='p00_etape1')return'0 - En-tête';
+ if(uid==='aiDFEjzPbb9XhQtxHMkEvp'&&TAB_PM[sec.name])return TAB_PM[sec.name];
+ var m=/^([A-Z])\. (.+)$/.exec(sec.short||'');return m?m[1]+' - '+m[2]:(sec.short||sec.label)}
+function visibleBlocks(blocks,all){var out=[],pend=null;
+ blocks.forEach(function(b){
+  if(b.t==='band'){pend=b;return}
+  var show=b.t==='qa'?(all||b.val!==null):(all||b.rows.length>0);
+  if(show){if(pend){out.push(pend);pend=null}out.push(b)}});
+ return out}
+function qaTable(rows){return'<div class="scroll"><table class="qt"><thead><tr><th>Question</th><th>Réponse</th></tr></thead><tbody>'+rows.map(function(b){
+ return'<tr><td class="q">'+esc(b.label)+'</td><td>'+(b.val===null?'<span class="muted">—</span>':esc(b.val))+'</td></tr>'}).join('')+'</tbody></table></div>'}
+function repTable(b){
+ if(!b.rows.length)return'<p class="muted">Aucune ligne saisie.</p>';
+ var cols=b.rows[0].map(function(c){return c.label}),keep=cols.map(function(c,i){return b.rows.some(function(r){return r[i]&&r[i].val!==null})});
+ return'<div class="scroll"><table><thead><tr>'+cols.filter(function(c,i){return keep[i]}).map(function(c){return'<th>'+esc(c)+'</th>'}).join('')+'</tr></thead><tbody>'
+  +b.rows.map(function(r){return'<tr>'+r.filter(function(c,i){return keep[i]}).map(function(c){return'<td>'+(c.val===null?'<span class="muted">—</span>':esc(c.val))+'</td>'}).join('')+'</tr>'}).join('')+'</tbody></table></div>'}
+
 async function ficheView(id){
  app('<p class="muted" style="padding:40px 0">Chargement de la fiche…</p>');
- var f;try{f=await api.fiche(id)}catch(x){app('<div class="card err">'+esc(x.message)+'</div><button class="btn ghost" id="bk">Retour</button>');$('#bk').onclick=listView;return}
+ var f;try{f=await api.fiche(id)}catch(x){app('<div class="card err">'+esc(errMsg(x))+'</div><button class="btn ghost" id="bk">Retour</button>');$('#bk').onclick=listView;return}
  var st=S[f.type_fiche],data=f.donnees||{};
  if(!st){app('<div class="card"><h2>Type de fiche inconnu</h2><p class="muted">'+esc(f.type_fiche)+'</p></div><button class="btn ghost" id="bk">Retour</button>');$('#bk').onclick=listView;return}
- var secs=st.sections.map(function(s){var a=section(s,data,st.choices);return{s:s,a:a,n:a.qa.length+a.tables.reduce(function(t,x){return t+x.rows.length},0)}});
- var cur=Math.max(0,secs.findIndex(function(x,i){return x.n>0&&i>0}));
- var head='<div class="top"><div><h1>'+esc(st.title)+'</h1><small>N° '+esc(f.numero_fiche||'—')+' · '+esc(f.site||'site non précisé')+' · reçue le '+esc(fdate(f.soumise_le))+'</small></div>'
-  +'<div class="row" style="flex:0 0 auto"><button class="btn ghost sm fit" id="bk">Retour à la liste</button><button class="btn sm fit" id="dl">Télécharger en Excel</button><button class="btn ghost sm fit" id="rm">Supprimer la fiche</button></div></div>';
- function body(){var x=secs[cur],h='<div class="card"><h2>'+esc(secTitle(x.s))+'</h2>';
-  if(!x.n)h+='<p class="muted">Aucune réponse dans cette section.</p>';
-  h+=x.a.qa.map(function(p){return'<div class="qa"><div class="q">'+esc(p[0])+'</div><div class="a">'+esc(p[1])+'</div></div>'}).join('');
-  x.a.tables.forEach(function(t){h+='<h3>'+esc(t.label)+'</h3><div class="scroll"><table><thead><tr>'+t.cols.map(function(c){return'<th>'+esc(c)+'</th>'}).join('')+'</tr></thead><tbody>'
-    +t.rows.map(function(r){return'<tr>'+r.map(function(v){return'<td>'+esc(v)+'</td>'}).join('')+'</tr>'}).join('')+'</tbody></table></div>'});
-  return h+'</div>'}
- function paint(){$('#nv').innerHTML=secs.map(function(x,i){return'<button data-i="'+i+'" class="'+(i===cur?'on':'')+'"><span>'+esc(secTitle(x.s).slice(0,48))+'</span><span class="n">'+(x.n||'')+'</span></button>'}).join('');
-  $('#bd').innerHTML=body();$('#nv').querySelectorAll('button').forEach(function(b){b.onclick=function(){cur=+b.dataset.i;paint();window.scrollTo(0,0)}})}
- app(head+'<div id="rmc"></div><div class="layout"><nav class="card nav" id="nv" aria-label="Sections"></nav><div id="bd"></div></div>');paint();
+ var secs=st.sections.map(function(s){return{s:s,tab:tabLabel(f.type_fiche,s),blocks:blocksOf(s,s.name+'/',data,st.choices,[])}});
+ var cur2=0,showEmpty=false;
+ var head='<p style="margin:20px 0 0"><button class="btn ghost sm" id="bk">← Retour à la liste</button></p>'
+  +'<h1 class="big">Fiche '+(f.numero_fiche?'N° '+esc(f.numero_fiche):'(sans numéro)')+'</h1>'
+  +'<p class="muted" style="margin:0 0 16px">'+[esc(st.title),f.site?esc(f.site):'',cur?esc(cur.nom):'','soumise le '+esc(fdate(f.soumise_le))].filter(Boolean).join(' · ')+'</p>'
+  +'<div class="row" style="align-items:center"><div class="fit"><button class="btn" id="dl">⬇ Télécharger l\'Excel de cette fiche</button></div><div class="fit"><button class="btn ghost" id="rm">Supprimer la fiche</button></div></div><div id="rmc" style="margin-top:12px"></div>'
+  +'<label class="chk"><input type="checkbox" id="ve"> Afficher aussi les questions sans réponse</label>';
+ function body(){var x=secs[cur2],vb=visibleBlocks(x.blocks,showEmpty),h='<h2 class="stitle">'+esc(x.s.label)+'</h2>',run=[];
+  function flush(){if(run.length){h+=qaTable(run);run=[]}}
+  if(!vb.length)h+='<p class="muted">Aucune réponse dans cette section.</p>';
+  vb.forEach(function(b){
+   if(b.t==='qa')run.push(b);
+   else if(b.t==='band'){flush();h+='<h3 class="part">'+esc(b.label)+'</h3>'}
+   else{flush();h+='<h3 class="part">'+esc(b.label)+'</h3>'+repTable(b)}});
+  flush();return h}
+ function paint(){$('#tb').innerHTML=secs.map(function(x,i){return'<button role="tab" data-i="'+i+'" aria-selected="'+(i===cur2)+'" class="'+(i===cur2?'on':'')+'">'+esc(x.tab)+'</button>'}).join('');
+  $('#bd').innerHTML=body();
+  $('#tb').querySelectorAll('button').forEach(function(b){b.onclick=function(){cur2=+b.dataset.i;paint();var on=$('#tb .on');if(on&&on.scrollIntoView)on.scrollIntoView({inline:'nearest',block:'nearest'})}})}
+ app(head+'<div class="stabs" id="tb" role="tablist" aria-label="Sections de la fiche"></div><div id="bd"></div>');paint();
  $('#bk').onclick=listView;
+ $('#ve').onchange=function(){showEmpty=this.checked;$('#bd').innerHTML=body()};
  $('#rm').onclick=function(){$('#rmc').innerHTML='<div class="card"><p>Supprimer cette fiche ? Elle sera cachée pendant 30 jours, puis effacée définitivement. Vous pouvez la restaurer depuis la corbeille.</p><div class="row"><div class="fit"><button class="btn sm" id="ok1" style="background:var(--danger)">Supprimer</button></div><div class="fit"><button class="btn ghost sm" id="no1">Annuler</button></div></div><div id="re" class="err"></div></div>';
   $('#no1').onclick=function(){$('#rmc').innerHTML=''};
   $('#ok1').onclick=async function(){try{await api.setFicheDeleted(f.id,true);flash='Fiche déplacée dans la corbeille pour 30 jours.';listView()}catch(x){$('#re').textContent=errMsg(x)}}};
  $('#dl').onclick=async function(){var btn=this;btn.disabled=true;
-  try{var wb=await buildFicheWorkbook(f,st);await downloadWb(wb,('Fiche_'+st.title+'_'+(f.numero_fiche||f.id)+'.xlsx').normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/[^A-Za-z0-9._-]+/g,'_'))}
+  try{var wb=await buildFicheWorkbook(f,st);await downloadWb(wb,('Fiche_'+st.title+'_'+(f.numero_fiche||f.id)+'.xlsx').normalize('NFD').replace(/[̀-ͯ]/g,'').replace(/[^A-Za-z0-9._-]+/g,'_'))}
   catch(x){$('#rmc').innerHTML='<div class="card err">Impossible de créer le fichier Excel : '+esc(x.message)+'</div>'}
   btn.disabled=false}}
 
