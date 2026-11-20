@@ -321,19 +321,102 @@ function repTable(b){
  return'<div class="scroll"><table><thead><tr>'+cols.filter(function(c,i){return keep[i]}).map(function(c){return'<th>'+esc(c)+'</th>'}).join('')+'</tr></thead><tbody>'
   +b.rows.map(function(r){return'<tr>'+r.filter(function(c,i){return keep[i]}).map(function(c){return'<td>'+(c.val===null?'<span class="muted">—</span>':esc(c.val))+'</td>'}).join('')+'</tr>'}).join('')+'</tbody></table></div>'}
 
+/* ---------- Points GPS : lecture, conversion UTM -> latitude/longitude, carte, KML ---------- */
+function utmToLL(E,N,zone,north){
+ var a=6378137,f=1/298.257223563,k0=0.9996,e2=f*(2-f),ep2=e2/(1-e2),e1=(1-Math.sqrt(1-e2))/(1+Math.sqrt(1-e2));
+ var x=E-500000,y=north?N:N-10000000,M=y/k0;
+ var mu=M/(a*(1-e2/4-3*e2*e2/64-5*e2*e2*e2/256));
+ var p=mu+(3*e1/2-27*Math.pow(e1,3)/32)*Math.sin(2*mu)+(21*e1*e1/16-55*Math.pow(e1,4)/32)*Math.sin(4*mu)+(151*Math.pow(e1,3)/96)*Math.sin(6*mu)+(1097*Math.pow(e1,4)/512)*Math.sin(8*mu);
+ var s=Math.sin(p),c=Math.cos(p),t=Math.tan(p),N1=a/Math.sqrt(1-e2*s*s),T1=t*t,C1=ep2*c*c,R1=a*(1-e2)/Math.pow(1-e2*s*s,1.5),D=x/(N1*k0);
+ var lat=p-(N1*t/R1)*(D*D/2-(5+3*T1+10*C1-4*C1*C1-9*ep2)*Math.pow(D,4)/24+(61+90*T1+298*C1+45*T1*T1-252*ep2-3*C1*C1)*Math.pow(D,6)/720);
+ var lon=(D-(1+2*T1+C1)*Math.pow(D,3)/6+(5-2*C1+28*T1-3*C1*C1+8*ep2+24*T1*T1)*Math.pow(D,5)/120)/c;
+ return{lat:lat*180/Math.PI,lon:(zone*6-183)+lon*180/Math.PI}}
+function parseZone(s){var m=/(\d{1,2})\s*([C-HJ-NP-X])?/i.exec(String(s||'').trim());if(!m)return null;var z=+m[1];if(z<1||z>60)return null;
+ var b=(m[2]||'N').toUpperCase();return{zone:z,band:m[2]?b:'',north:b>='N',txt:z+(m[2]?b:'')}}
+function numUTM(v){if(v==null||v==='')return null;var n=Number(String(v).replace(/\s/g,'').replace(',','.'));return isFinite(n)?n:null}
+function gpsPoints(st,data,zone){
+ var pts=[],ix=nameIndex(st);
+ (function w(node,path){node.items.forEach(function(it){
+  if(it.kind==='group'){w(it,path+it.name+'/');return}
+  if(it.kind!=='repeat')return;
+  var arr=data[path+it.name];if(!Array.isArray(arr)||!arr.length)return;
+  var f={x:null,y:null,xs:null,ys:null,nm:null,ds:null,ph:null};
+  (function sc(n,p){n.items.forEach(function(q){
+   if(q.kind==='group'){sc(q,p+q.name+'/');return}if(q.kind!=='q')return;
+   var k=p+q.name;
+   if(/(^|_)x$/.test(q.name))f.x=k;else if(/(^|_)x_saisie$/.test(q.name))f.xs=k;
+   else if(/(^|_)y$/.test(q.name))f.y=k;else if(/(^|_)y_saisie$/.test(q.name))f.ys=k;
+   else if(!f.nm&&/(num|_nom)$/.test(q.name)&&!/photo/.test(q.name))f.nm=k;
+   else if(!f.ds&&/(description|observation)$/.test(q.name))f.ds=k})})(it,path+it.name+'/');
+  if(!(f.x||f.xs)||!(f.y||f.ys))return;
+  var src=cleanLbl(it.label||it.name);
+  arr.forEach(function(el,i){
+   var X=numUTM(el[f.x]);if(X==null)X=numUTM(el[f.xs]);var Y=numUTM(el[f.y]);if(Y==null)Y=numUTM(el[f.ys]);
+   if(X==null&&Y==null)return;
+   var p={src:src,name:(f.nm&&el[f.nm])?String(el[f.nm]):src+' '+(i+1),desc:f.ds&&el[f.ds]?String(el[f.ds]):'',x:X,y:Y,ok:false};
+   if(X!=null&&Y!=null&&X>100000&&X<900000&&Y>=0&&Y<10000000&&zone){var ll=utmToLL(X,Y,zone.zone,zone.north);p.lat=ll.lat;p.lon=ll.lon;p.ok=true}
+   pts.push(p)})})})({items:st.sections},'');
+ return pts}
+function zoneOf(st,data){var x=nameIndex(st).c_zone_utm;return x?data[x.key]:null}
+function loadLeaflet(){return new Promise(function(res,rej){
+ if(window.L)return res();
+ var l=document.createElement('link');l.rel='stylesheet';l.href='https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.css';document.head.appendChild(l);
+ var s=document.createElement('script');s.src='https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js';s.onload=res;s.onerror=function(){rej(new Error('Leaflet'))};document.head.appendChild(s)})}
+function kmlOf(pts,title){
+ var e=function(s){return String(s).replace(/[&<>]/g,function(c){return{'&':'&amp;','<':'&lt;','>':'&gt;'}[c]})},by={};
+ pts.forEach(function(p){(by[p.src]=by[p.src]||[]).push(p)});
+ return'<?xml version="1.0" encoding="UTF-8"?>\n<kml xmlns="http://www.opengis.net/kml/2.2"><Document><name>'+e(title)+'</name>'
+  +Object.keys(by).map(function(k){return'<Folder><name>'+e(k)+'</name>'+by[k].map(function(p){
+   return'<Placemark><name>'+e(p.name)+'</name><description>'+e((p.desc?p.desc+' — ':'')+'X '+p.x+' / Y '+p.y)+'</description><Point><coordinates>'+p.lon.toFixed(7)+','+p.lat.toFixed(7)+',0</coordinates></Point></Placemark>'}).join('')+'</Folder>'}).join('')
+  +'</Document></kml>'}
+function gpsTab(f,st,data,box){
+ var zr=zoneOf(st,data),zs=zr?String(zr).trim():'28P',map=null,layer=null,markers=[];
+ box.innerHTML='<p class="muted" style="margin:0 0 12px">Les points sont lus dans les tableaux de la fiche (points GPS, points importés, échantillons…). Les coordonnées UTM sont converties en latitude / longitude selon la zone indiquée.</p>'
+  +'<div class="row" style="align-items:flex-end;margin-bottom:12px"><div class="fit"><label for="zn">Zone UTM</label><input id="zn" style="width:110px" value="'+esc(zs)+'" maxlength="4"></div>'
+  +'<div class="fit"><button class="btn sm" id="kml">⬇ Fichier Google Earth (.kml)</button></div></div><div id="zm" class="muted"></div><div id="gl"></div>';
+ function draw(){
+  var z=parseZone($('#zn').value),pts=gpsPoints(st,data,z),ok=pts.filter(function(p){return p.ok});
+  $('#zm').innerHTML=!zr?'<p class="err">La zone UTM n\'a pas été saisie dans la fiche : vérifiez la valeur ci-dessus (28P par défaut).</p>':'';
+  if(!z)$('#zm').innerHTML+='<p class="err">Zone UTM non reconnue (exemple : 28P).</p>';
+  $('#kml').disabled=!ok.length;
+  if(!pts.length){$('#gl').innerHTML='<p class="muted">Aucun point GPS saisi dans cette fiche.</p>';return}
+  $('#gl').innerHTML='<h3 class="part">Tableau des points ('+pts.length+')</h3><div class="scroll"><table><thead><tr><th>Nom</th><th>Source</th><th>X Est (m)</th><th>Y Nord (m)</th><th>Latitude</th><th>Longitude</th><th></th></tr></thead><tbody>'
+   +pts.map(function(p,i){return'<tr><td>'+esc(p.name)+(p.desc?'<br><small class="muted">'+esc(p.desc)+'</small>':'')+'</td><td>'+esc(p.src)+'</td><td>'+(p.x==null?'—':p.x)+'</td><td>'+(p.y==null?'—':p.y)+'</td>'
+    +(p.ok?'<td>'+p.lat.toFixed(6)+'</td><td>'+p.lon.toFixed(6)+'</td><td><button class="btn ghost sm" data-i="'+i+'">Voir</button> <a href="https://www.google.com/maps?q='+p.lat.toFixed(6)+','+p.lon.toFixed(6)+'&t=k" target="_blank" rel="noopener">Google Maps</a></td>'
+     :'<td colspan="3" class="err">Coordonnées invalides ou zone inconnue</td>')+'</tr>'}).join('')+'</tbody></table></div>'
+   +'<h3 class="part">Carte satellite</h3>'+(ok.length?'<div id="mp" style="height:480px;border:1px solid var(--line);border-radius:10px"></div><p class="muted" style="font-size:13px">Fond : Esri World Imagery. Cliquez sur un point pour voir son nom.</p>':'<p class="muted">Aucun point exploitable à afficher.</p>');
+  if(!ok.length)return;
+  loadLeaflet().then(function(){
+   if(map){map.remove();map=null}
+   map=L.map('mp');
+   L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',{maxZoom:19,attribution:'Tiles © Esri'}).addTo(map);
+   markers=[];var ll=[];
+   pts.forEach(function(p,i){if(!p.ok)return;var m=L.circleMarker([p.lat,p.lon],{radius:7,color:'#fff',weight:2,fillColor:'#E8C766',fillOpacity:1}).addTo(map);
+    m.bindTooltip(p.name,{permanent:ok.length<=25,direction:'top',offset:[0,-6]});m.bindPopup('<b>'+esc(p.name)+'</b><br>'+esc(p.src)+'<br>'+p.lat.toFixed(6)+', '+p.lon.toFixed(6));markers[i]=m;ll.push([p.lat,p.lon])});
+   map.fitBounds(ll,{padding:[40,40],maxZoom:17});
+   $('#gl').querySelectorAll('button[data-i]').forEach(function(b){b.onclick=function(){var m=markers[+b.dataset.i];map.setView(m.getLatLng(),18);m.openPopup();$('#mp').scrollIntoView({block:'center'})}})
+  }).catch(function(){$('#mp').outerHTML='<p class="err">La carte n\'a pas pu être chargée (connexion internet requise). Le tableau et le fichier Google Earth restent disponibles.</p>'})}
+ $('#zn').oninput=draw;
+ $('#kml').onclick=function(){var pts=gpsPoints(st,data,parseZone($('#zn').value)).filter(function(p){return p.ok});if(!pts.length)return;
+  var blob=new Blob([kmlOf(pts,'Fiche '+(f.numero_fiche||f.id))],{type:'application/vnd.google-earth.kml+xml'}),a=document.createElement('a');
+  a.href=URL.createObjectURL(blob);a.download=('Points_fiche_'+(f.numero_fiche||f.id)+'.kml').normalize('NFD').replace(/[̀-ͯ]/g,'').replace(/[^A-Za-z0-9._-]+/g,'_');
+  document.body.appendChild(a);a.click();setTimeout(function(){URL.revokeObjectURL(a.href);a.remove()},500)};
+ draw()}
+
 async function ficheView(id){
  app('<p class="muted" style="padding:40px 0">Chargement de la fiche…</p>');
  var f;try{f=await api.fiche(id)}catch(x){app('<div class="card err">'+esc(errMsg(x))+'</div><button class="btn ghost" id="bk">Retour</button>');$('#bk').onclick=listView;return}
  var st=S[f.type_fiche],data=f.donnees||{};
  if(!st){app('<div class="card"><h2>Type de fiche inconnu</h2><p class="muted">'+esc(f.type_fiche)+'</p></div><button class="btn ghost" id="bk">Retour</button>');$('#bk').onclick=listView;return}
  var secs=st.sections.map(function(s){return{s:s,tab:tabLabel(f.type_fiche,s),blocks:blocksOf(s,s.name+'/',data,st.choices,[])}});
+ secs.push({s:{label:'Carte des points GPS'},tab:'📍 Carte GPS',gps:true});
  var cur2=0,showEmpty=false;
  var head='<p style="margin:20px 0 0"><button class="btn ghost sm" id="bk">← Retour à la liste</button></p>'
   +'<h1 class="big">Fiche '+(f.numero_fiche?'N° '+esc(f.numero_fiche):'(sans numéro)')+'</h1>'
   +'<p class="muted" style="margin:0 0 16px">'+[esc(st.title),f.site?esc(f.site):'',cur?esc(cur.nom):'','soumise le '+esc(fdate(f.soumise_le))].filter(Boolean).join(' · ')+'</p>'
   +'<div class="row" style="align-items:center"><div class="fit"><button class="btn" id="dl">⬇ Télécharger l\'Excel de cette fiche</button></div><div class="fit"><button class="btn ghost" id="rm">Supprimer la fiche</button></div></div><div id="rmc" style="margin-top:12px"></div>'
   +'<label class="chk"><input type="checkbox" id="ve"> Afficher aussi les questions sans réponse</label>';
- function body(){var x=secs[cur2],vb=visibleBlocks(x.blocks,showEmpty),h='<h2 class="stitle">'+esc(x.s.label)+'</h2>',run=[];
+ function body(){var x=secs[cur2];if(x.gps)return'<h2 class="stitle">Carte des points GPS</h2><div id="gpsbox"></div>';var vb=visibleBlocks(x.blocks,showEmpty),h='<h2 class="stitle">'+esc(x.s.label)+'</h2>',run=[];
   function flush(){if(run.length){h+=qaTable(run);run=[]}}
   if(!vb.length)h+='<p class="muted">Aucune réponse dans cette section.</p>';
   vb.forEach(function(b){
@@ -342,11 +425,11 @@ async function ficheView(id){
    else{flush();h+='<h3 class="part">'+esc(b.label)+'</h3>'+repTable(b)}});
   flush();return h}
  function paint(){$('#tb').innerHTML=secs.map(function(x,i){return'<button role="tab" data-i="'+i+'" aria-selected="'+(i===cur2)+'" class="'+(i===cur2?'on':'')+'">'+esc(x.tab)+'</button>'}).join('');
-  $('#bd').innerHTML=body();
+  $('#bd').innerHTML=body();if(secs[cur2].gps)gpsTab(f,st,data,$('#gpsbox'));
   $('#tb').querySelectorAll('button').forEach(function(b){b.onclick=function(){cur2=+b.dataset.i;paint();var on=$('#tb .on');if(on&&on.scrollIntoView)on.scrollIntoView({inline:'nearest',block:'nearest'})}})}
  app(head+'<div class="stabs" id="tb" role="tablist" aria-label="Sections de la fiche"></div><div id="bd"></div>');paint();
  $('#bk').onclick=listView;
- $('#ve').onchange=function(){showEmpty=this.checked;$('#bd').innerHTML=body()};
+ $('#ve').onchange=function(){showEmpty=this.checked;if(!secs[cur2].gps)$('#bd').innerHTML=body()};
  $('#rm').onclick=function(){$('#rmc').innerHTML='<div class="card"><p>Supprimer cette fiche ? Elle sera cachée pendant 30 jours, puis effacée définitivement. Vous pouvez la restaurer depuis la corbeille.</p><div class="row"><div class="fit"><button class="btn sm" id="ok1" style="background:var(--danger)">Supprimer</button></div><div class="fit"><button class="btn ghost sm" id="no1">Annuler</button></div></div><div id="re" class="err"></div></div>';
   $('#no1').onclick=function(){$('#rmc').innerHTML=''};
   $('#ok1').onclick=async function(){try{await api.setFicheDeleted(f.id,true);flash='Fiche déplacée dans la corbeille pour 30 jours.';listView()}catch(x){$('#re').textContent=errMsg(x)}}};
