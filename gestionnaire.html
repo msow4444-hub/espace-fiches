@@ -122,7 +122,7 @@ var DEMO_ROWS=[
    {'p03_c_gps/c_points/c_date':'2026-11-18','p03_c_gps/c_points/c_appareil':'Téléphone','p03_c_gps/c_points/c_point_num':'-002'}]}}
 ];
 var SVG=function(c){return'data:image/svg+xml;utf8,'+encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" width="320" height="240"><rect width="320" height="240" fill="'+c+'"/><text x="160" y="125" font-size="22" text-anchor="middle" fill="#fff">Photo test</text></svg>')};
-var DB={files:[{fiche_uuid:'u1',nom:'photo_test_1.jpg',mimetype:'image/jpeg',taille:245000,question:'p03_c_gps/c_points[1]/c_photo_1',url:SVG('#4A7FB0')},{fiche_uuid:'u1',nom:'TEST_kedougou.gpx',mimetype:'application/gpx+xml',taille:820,question:'p03_c_gps/c_import[1]/c_fichier',url:'data:text/plain;base64,PGdweC8+'}],soc:[{id:'s1',nom:'Société test',code:'A4159990',supprimee_le:null,cree_le:'2026-11-18T10:00:00Z'}],fiches:DEMO_ROWS,compte:null};
+var DB={files:[{fiche_uuid:'u1',nom:'photo_test_1.jpg',mimetype:'image/jpeg',taille:245000,question:'p03_c_gps/c_points[1]/c_photo_1',url:SVG('#4A7FB0')},{fiche_uuid:'u1',nom:'TEST_kedougou.gpx',mimetype:'application/gpx+xml',taille:820,question:'p03_c_gps/c_import[1]/c_fichier',url:'data:application/gpx+xml;base64,PD94bWwgdmVyc2lvbj0iMS4wIj8+PGdweCB2ZXJzaW9uPSIxLjEiIHhtbG5zPSJodHRwOi8vd3d3LnRvcG9ncmFmaXguY29tL0dQWC8xLzEiPjx3cHQgbGF0PSIxMi41NiIgbG9uPSItMTIuMTgiPjxuYW1lPkdQWC1URVNULTAwMTwvbmFtZT48ZGVzYz5Qb2ludCB0ZXN0IDE8L2Rlc2M+PC93cHQ+PHdwdCBsYXQ9IjEyLjU2MyIgbG9uPSItMTIuMTc2Ij48bmFtZT5HUFgtVEVTVC0wMDI8L25hbWU+PC93cHQ+PHRyaz48bmFtZT5UcmFjZSB0ZXN0PC9uYW1lPjx0cmtzZWc+PHRya3B0IGxhdD0iMTIuNTYiIGxvbj0iLTEyLjE4Ii8+PHRya3B0IGxhdD0iMTIuNTYzIiBsb249Ii0xMi4xNzYiLz48dHJrcHQgbGF0PSIxMi41NjYiIGxvbj0iLTEyLjE4MiIvPjwvdHJrc2VnPjwvdHJrPjwvZ3B4Pg=='}],soc:[{id:'s1',nom:'Société test',code:'A4159990',supprimee_le:null,cree_le:'2026-11-18T10:00:00Z'}],fiches:DEMO_ROWS,compte:null};
 function demoCheck(code,selfId){if(!code)return;if(!VALID.test(code))throw{code:'23514'};
  if(DB.soc.some(function(s){return s.id!==selfId&&s.code.toUpperCase()===code.toUpperCase()}))throw{code:'23505'}}
 var api={
@@ -389,24 +389,33 @@ function loadLeaflet(){return new Promise(function(res,rej){
  if(window.L)return res();
  var l=document.createElement('link');l.rel='stylesheet';l.href='https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.css';document.head.appendChild(l);
  var s=document.createElement('script');s.src='https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js';s.onload=res;s.onerror=function(){rej(new Error('Leaflet'))};document.head.appendChild(s)})}
-function kmlOf(pts,title){
+function parseGpx(txt,nom){var d=new DOMParser().parseFromString(txt,'application/xml');if(d.getElementsByTagName('parsererror').length)return null;
+ var pts=[],trs=[],g=function(n,t){var e=n.getElementsByTagName(t)[0];return e?e.textContent.trim():''};
+ Array.prototype.forEach.call(d.getElementsByTagName('wpt'),function(w){var lat=parseFloat(w.getAttribute('lat')),lon=parseFloat(w.getAttribute('lon'));if(!isFinite(lat)||!isFinite(lon))return;
+  pts.push({src:'GPX : '+nom,name:g(w,'name')||'Point GPX',desc:g(w,'desc')||g(w,'cmt'),x:null,y:null,lat:lat,lon:lon,ok:true})});
+ Array.prototype.forEach.call(d.getElementsByTagName('trk'),function(t,i){var seg=[];Array.prototype.forEach.call(t.getElementsByTagName('trkpt'),function(q){var la=parseFloat(q.getAttribute('lat')),lo=parseFloat(q.getAttribute('lon'));if(isFinite(la)&&isFinite(lo))seg.push([la,lo])});
+  if(seg.length>1)trs.push({name:g(t,'name')||('Trace '+(i+1)),src:'GPX : '+nom,pts:seg})});
+ return{pts:pts,trs:trs}}
+function kmlOf(pts,title,trs){
  var e=function(s){return String(s).replace(/[&<>]/g,function(c){return{'&':'&amp;','<':'&lt;','>':'&gt;'}[c]})},by={};
  pts.forEach(function(p){(by[p.src]=by[p.src]||[]).push(p)});
  return'<?xml version="1.0" encoding="UTF-8"?>\n<kml xmlns="http://www.opengis.net/kml/2.2"><Document><name>'+e(title)+'</name>'
   +Object.keys(by).map(function(k){return'<Folder><name>'+e(k)+'</name>'+by[k].map(function(p){
    return'<Placemark><name>'+e(p.name)+'</name><description>'+e((p.desc?p.desc+' — ':'')+'X '+p.x+' / Y '+p.y)+'</description><Point><coordinates>'+p.lon.toFixed(7)+','+p.lat.toFixed(7)+',0</coordinates></Point></Placemark>'}).join('')+'</Folder>'}).join('')
+  +(trs||[]).map(function(t){return'<Placemark><name>'+e(t.name)+'</name><LineString><tessellate>1</tessellate><coordinates>'+t.pts.map(function(q){return q[1].toFixed(7)+','+q[0].toFixed(7)+',0'}).join(' ')+'</coordinates></LineString></Placemark>'}).join('')
   +'</Document></kml>'}
-function gpsTab(f,st,data,box){
- var zr=zoneOf(st,data),zs=zr?String(zr).trim():'28P',map=null,layer=null,markers=[];
+function gpsTab(f,st,data,box,flist){
+ var zr=zoneOf(st,data),zs=zr?String(zr).trim():'28P',map=null,layer=null,markers=[],gpxFiles=(flist||[]).filter(function(x){return /\.gpx$/i.test(x.nom)||/gpx/i.test(x.mimetype||'')}),gpxPts=[],gpxTr=[],gpxErr=[];
  box.innerHTML='<p class="muted" style="margin:0 0 12px">Les points sont lus dans les tableaux de la fiche (points GPS, points importés, échantillons…). Les coordonnées UTM sont converties en latitude / longitude selon la zone indiquée.</p>'
   +'<div class="row" style="align-items:flex-end;margin-bottom:12px"><div class="fit"><label for="zn">Zone UTM</label><input id="zn" style="width:110px" value="'+esc(zs)+'" maxlength="4"></div>'
-  +'<div class="fit"><button class="btn sm" id="kml">⬇ Fichier Google Earth (.kml)</button></div></div><div id="zm" class="muted"></div><div id="gl"></div>';
+  +'<div class="fit"><button class="btn sm" id="kml">⬇ Tous les points en KML (Google Earth)</button></div>'
+  +gpxFiles.map(function(x){return'<div class="fit"><a class="btn ghost sm" href="'+esc(dlUrl(x))+'">⬇ GPX d\'origine : '+esc(x.nom)+'</a></div>'}).join('')+'</div><div id="zm" class="muted"></div><div id="gl"></div>';
  function draw(){
-  var z=parseZone($('#zn').value),pts=gpsPoints(st,data,z),ok=pts.filter(function(p){return p.ok});
-  $('#zm').innerHTML=!zr?'<p class="err">La zone UTM n\'a pas été saisie dans la fiche : vérifiez la valeur ci-dessus (28P par défaut).</p>':'';
+  var z=parseZone($('#zn').value),pts=gpsPoints(st,data,z).concat(gpxPts),ok=pts.filter(function(p){return p.ok});
+  $('#zm').innerHTML=gpxErr.map(function(m){return'<p class="err">'+esc(m)+'</p>'}).join('')+(!zr?'<p class="err">La zone UTM n\'a pas été saisie dans la fiche : vérifiez la valeur ci-dessus (28P par défaut).</p>':'');
   if(!z)$('#zm').innerHTML+='<p class="err">Zone UTM non reconnue (exemple : 28P).</p>';
-  $('#kml').disabled=!ok.length;
-  if(!pts.length){$('#gl').innerHTML='<p class="muted">Aucun point GPS saisi dans cette fiche.</p>';return}
+  $('#kml').disabled=!ok.length&&!gpxTr.length;
+  if(!pts.length){$('#gl').innerHTML='<p class="muted">Aucun point GPS dans cette fiche.</p>';return}
   $('#gl').innerHTML='<h3 class="part">Tableau des points ('+pts.length+')</h3><div class="scroll"><table><thead><tr><th>Nom</th><th>Source</th><th>X Est (m)</th><th>Y Nord (m)</th><th>Latitude</th><th>Longitude</th><th></th></tr></thead><tbody>'
    +pts.map(function(p,i){return'<tr><td>'+esc(p.name)+(p.desc?'<br><small class="muted">'+esc(p.desc)+'</small>':'')+'</td><td>'+esc(p.src)+'</td><td>'+(p.x==null?'—':p.x)+'</td><td>'+(p.y==null?'—':p.y)+'</td>'
     +(p.ok?'<td>'+p.lat.toFixed(6)+'</td><td>'+p.lon.toFixed(6)+'</td><td><button class="btn ghost sm" data-i="'+i+'">Voir</button> <a href="https://www.google.com/maps?q='+p.lat.toFixed(6)+','+p.lon.toFixed(6)+'&t=k" target="_blank" rel="noopener">Google Maps</a></td>'
@@ -420,15 +429,19 @@ function gpsTab(f,st,data,box){
    markers=[];var ll=[];
    pts.forEach(function(p,i){if(!p.ok)return;var m=L.circleMarker([p.lat,p.lon],{radius:7,color:'#fff',weight:2,fillColor:'#E8C766',fillOpacity:1}).addTo(map);
     m.bindTooltip(p.name,{permanent:ok.length<=25,direction:'top',offset:[0,-6]});m.bindPopup('<b>'+esc(p.name)+'</b><br>'+esc(p.src)+'<br>'+p.lat.toFixed(6)+', '+p.lon.toFixed(6));markers[i]=m;ll.push([p.lat,p.lon])});
+   gpxTr.forEach(function(t){L.polyline(t.pts,{color:'#E8C766',weight:3}).bindTooltip(t.name).addTo(map);t.pts.forEach(function(q){ll.push(q)})});
    map.fitBounds(ll,{padding:[40,40],maxZoom:17});
    $('#gl').querySelectorAll('button[data-i]').forEach(function(b){b.onclick=function(){var m=markers[+b.dataset.i];map.setView(m.getLatLng(),18);m.openPopup();$('#mp').scrollIntoView({block:'center'})}})
   }).catch(function(){$('#mp').outerHTML='<p class="err">La carte n\'a pas pu être chargée (connexion internet requise). Le tableau et le fichier Google Earth restent disponibles.</p>'})}
  $('#zn').oninput=draw;
- $('#kml').onclick=function(){var pts=gpsPoints(st,data,parseZone($('#zn').value)).filter(function(p){return p.ok});if(!pts.length)return;
-  var blob=new Blob([kmlOf(pts,'Fiche '+(f.numero_fiche||f.id))],{type:'application/vnd.google-earth.kml+xml'}),a=document.createElement('a');
+ $('#kml').onclick=function(){var pts=gpsPoints(st,data,parseZone($('#zn').value)).concat(gpxPts).filter(function(p){return p.ok});if(!pts.length&&!gpxTr.length)return;
+  var blob=new Blob([kmlOf(pts,'Fiche '+(f.numero_fiche||f.id),gpxTr)],{type:'application/vnd.google-earth.kml+xml'}),a=document.createElement('a');
   a.href=URL.createObjectURL(blob);a.download=('Points_fiche_'+(f.numero_fiche||f.id)+'.kml').normalize('NFD').replace(/[̀-ͯ]/g,'').replace(/[^A-Za-z0-9._-]+/g,'_');
   document.body.appendChild(a);a.click();setTimeout(function(){URL.revokeObjectURL(a.href);a.remove()},500)};
- draw()}
+ if(!gpxFiles.length)return draw();
+ $('#gl').innerHTML='<p class="muted">Lecture du fichier GPX…</p>';
+ return Promise.all(gpxFiles.map(function(x){return fetch(x.url).then(function(r){if(!r.ok)throw new Error(r.status);return r.text()}).then(function(t){var g=parseGpx(t,x.nom);if(!g)throw new Error('fichier illisible');gpxPts=gpxPts.concat(g.pts);gpxTr=gpxTr.concat(g.trs)}).catch(function(e){gpxErr.push('GPX « '+x.nom+' » non lu : '+e.message)})})).then(draw);
+}
 
 async function ficheView(id){
  app('<p class="muted" style="padding:40px 0">Chargement de la fiche…</p>');
@@ -455,7 +468,7 @@ async function ficheView(id){
    else{flush();h+='<h3 class="part">'+esc(b.label)+'</h3>'+repTable(b)}});
   flush();return h}
  function paint(){$('#tb').innerHTML=secs.map(function(x,i){return'<button role="tab" data-i="'+i+'" aria-selected="'+(i===cur2)+'" class="'+(i===cur2?'on':'')+'">'+esc(x.tab)+'</button>'}).join('');
-  $('#bd').innerHTML=body();if(secs[cur2].gps)gpsTab(f,st,data,$('#gpsbox'));
+  $('#bd').innerHTML=body();if(secs[cur2].gps)gpsTab(f,st,data,$('#gpsbox'),flist);
   $('#tb').querySelectorAll('button').forEach(function(b){b.onclick=function(){cur2=+b.dataset.i;paint();var on=$('#tb .on');if(on&&on.scrollIntoView)on.scrollIntoView({inline:'nearest',block:'nearest'})}})}
  app(head+'<div class="stabs" id="tb" role="tablist" aria-label="Sections de la fiche"></div><div id="bd"></div>');paint();
  $('#bk').onclick=listView;
