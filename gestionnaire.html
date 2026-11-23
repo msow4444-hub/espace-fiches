@@ -123,6 +123,8 @@ var DEMO_ROWS=[
 ];
 var SVG=function(c){return'data:image/svg+xml;utf8,'+encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" width="320" height="240"><rect width="320" height="240" fill="'+c+'"/><text x="160" y="125" font-size="22" text-anchor="middle" fill="#fff">Photo test</text></svg>')};
 var DB={files:[{fiche_uuid:'u1',nom:'photo_test_1.jpg',mimetype:'image/jpeg',taille:245000,question:'p03_c_gps/c_points[1]/c_photo_1',url:SVG('#4A7FB0')},{fiche_uuid:'u1',nom:'TEST_kedougou.gpx',mimetype:'application/gpx+xml',taille:820,question:'p03_c_gps/c_import[1]/c_fichier',url:'data:application/gpx+xml;base64,PD94bWwgdmVyc2lvbj0iMS4wIj8+PGdweCB2ZXJzaW9uPSIxLjEiIHhtbG5zPSJodHRwOi8vd3d3LnRvcG9ncmFmaXguY29tL0dQWC8xLzEiPjx3cHQgbGF0PSIxMi41NiIgbG9uPSItMTIuMTgiPjxuYW1lPkdQWC1URVNULTAwMTwvbmFtZT48ZGVzYz5Qb2ludCB0ZXN0IDE8L2Rlc2M+PC93cHQ+PHdwdCBsYXQ9IjEyLjU2MyIgbG9uPSItMTIuMTc2Ij48bmFtZT5HUFgtVEVTVC0wMDI8L25hbWU+PC93cHQ+PHRyaz48bmFtZT5UcmFjZSB0ZXN0PC9uYW1lPjx0cmtzZWc+PHRya3B0IGxhdD0iMTIuNTYiIGxvbj0iLTEyLjE4Ii8+PHRya3B0IGxhdD0iMTIuNTYzIiBsb249Ii0xMi4xNzYiLz48dHJrcHQgbGF0PSIxMi41NjYiIGxvbj0iLTEyLjE4MiIvPjwvdHJrc2VnPjwvdHJrPjwvZ3B4Pg=='}],soc:[{id:'s1',nom:'Société test',code:'A4159990',supprimee_le:null,cree_le:'2026-11-18T10:00:00Z'}],fiches:DEMO_ROWS,compte:null};
+DB.soc.push({id:'s2',nom:'Mines du Sud',code:'B7777777',supprimee_le:null,cree_le:'2026-11-19T10:00:00Z'});
+DB.fiches.push({id:4,uuid:'o4',societe_id:null,supprimee_le:null,type_fiche:'aiDFEjzPbb9XhQtxHMkEvp',numero_fiche:'F-201/11/2026',site:'Site inconnu',societe:'Mines du Sud',soumise_le:'2026-11-20T08:00:00Z',donnees:{code_societe:'B7777779','p00_etape1/entete_societe':'Mines du Sud','p01_a_identification/a_numero_fiche':'F-201/11/2026'}});
 function demoCheck(code,selfId){if(!code)return;if(!VALID.test(code))throw{code:'23514'};
  if(DB.soc.some(function(s){return s.id!==selfId&&s.code.toUpperCase()===code.toUpperCase()}))throw{code:'23505'}}
 var api={
@@ -142,6 +144,21 @@ var api={
   var q=sb.from('fiches').select('id,type_fiche,numero_fiche,site,soumise_le',{count:'exact'}).eq('societe_id',cur.id).is('supprimee_le',null).order('soumise_le',{ascending:false}).range(from,from+PAGE-1);
   if(f.type)q=q.eq('type_fiche',f.type);if(f.from)q=q.gte('soumise_le',f.from);if(f.to)q=q.lte('soumise_le',f.to+'T23:59:59');
   var r=await q;if(r.error)throw r.error;return r},
+ async toutesFiches(){
+  if(DEMO)return DB.fiches.filter(function(r){return r.societe_id===cur.id&&!r.supprimee_le});
+  var out=[],from=0,step=200;
+  for(;;){var r=T(await sb.from('fiches').select('*').eq('societe_id',cur.id).is('supprimee_le',null).order('soumise_le',{ascending:false}).range(from,from+step-1));out=out.concat(r);if(r.length<step)break;from+=step}
+  return out},
+ async fichiersDe(uuids){
+  if(DEMO)return(DB.files||[]).filter(function(x){return uuids.indexOf(x.fiche_uuid)>=0});
+  var out=[];
+  for(var i=0;i<uuids.length;i+=100){
+   var r=T(await sb.from('fiches_fichiers').select('fiche_uuid,nom,mimetype,taille,question,chemin').in('fiche_uuid',uuids.slice(i,i+100)));
+   if(!r.length)continue;
+   var su=await sb.storage.from('fiches-fichiers').createSignedUrls(r.map(function(x){return x.chemin}),3600);
+   if(su.error)throw su.error;
+   r.forEach(function(x,k){x.url=su.data[k]&&su.data[k].signedUrl||''});out=out.concat(r)}
+  return out},
  async fichiers(uuid){
   if(DEMO)return (DB.files||[]).filter(function(x){return x.fiche_uuid===uuid});
   var r=T(await sb.from('fiches_fichiers').select('nom,mimetype,taille,question,chemin').eq('fiche_uuid',uuid).order('id'));
@@ -204,11 +221,11 @@ function logout(){if(!DEMO)sb.auth.signOut()}
 function bar(showSel){
  var left='<h1>Espace gestionnaire</h1>';
  if(showSel&&soc.length)left='<div class="fit"><label for="sc" class="sr">Société</label><select id="sc">'+soc.map(function(s){return'<option value="'+esc(s.id)+'"'+(cur&&s.id===cur.id?' selected':'')+'>'+esc(s.nom)+'</option>'}).join('')+'</select></div><div class="fit"><button class="btn ghost sm" id="ns">+ Nouvelle société</button></div>';
- return'<div class="top"><div class="row" style="align-items:center;flex:1 1 300px">'+left+'</div><div class="row" style="flex:0 0 auto;align-items:center"><div class="fit"><button class="btn ghost sm" id="gc">Corbeille</button></div><div class="fit"><button class="btn ghost sm" id="ga">Mon compte</button></div><div class="fit"><button class="btn ghost sm" id="lo">'+(DEMO?'Démo':'Se déconnecter')+'</button></div></div></div>'}
+ return'<div class="top"><div class="row" style="align-items:center;flex:1 1 300px">'+left+'</div><div class="row" style="flex:0 0 auto;align-items:center">'+(isAdmin?'<div class="fit"><button class="btn ghost sm" id="ad">Espace admin</button></div>':'')+'<div class="fit"><button class="btn ghost sm" id="gc">Corbeille</button></div><div class="fit"><button class="btn ghost sm" id="ga">Mon compte</button></div><div class="fit"><button class="btn ghost sm" id="lo">'+(DEMO?'Démo':'Se déconnecter')+'</button></div></div></div>'}
 function bindBar(){
  var e=$('#sc');if(e)e.onchange=function(){cur=soc.find(function(s){return s.id===e.value});try{localStorage.setItem('soc_cur',cur.id)}catch(x){}filters={type:'',from:'',to:'',text:''};listView()};
  if($('#ns'))$('#ns').onclick=function(){newSocView(true)};
- $('#gc').onclick=trashView;$('#ga').onclick=accountView;$('#lo').onclick=logout}
+ if($('#ad'))$('#ad').onclick=function(){adminView('orph')};$('#gc').onclick=trashView;$('#ga').onclick=accountView;$('#lo').onclick=logout}
 function pwField(id,auto){return'<div class="pw"><input id="'+id+'" type="password" minlength="8" autocomplete="'+auto+'" required><button type="button" class="eye" id="'+id+'e" aria-label="Afficher le mot de passe" aria-pressed="false">'+EYE+'</button></div>'}
 function bindEye(id){var i=$('#'+id),b=$('#'+id+'e');b.onclick=function(){var show=i.type==='password';i.type=show?'text':'password';b.innerHTML=show?EYEOFF:EYE;b.setAttribute('aria-pressed',show);b.setAttribute('aria-label',show?'Masquer le mot de passe':'Afficher le mot de passe')}}
 
@@ -218,8 +235,9 @@ function authView(mode,msg){
  +'<form id="af"><label for="em">Adresse e-mail</label><input id="em" type="email" autocomplete="email" required>'
  +'<label for="pw">Mot de passe</label>'+pwField('pw',mode==='in'?'current-password':'new-password')
  +'<p class="muted" style="font-size:13px;margin-top:6px">'+(mode==='up'?'8 caractères minimum.':'')+'</p>'
- +'<button class="btn" style="width:100%;margin-top:6px">'+(mode==='in'?'Se connecter':'Créer mon compte')+'</button><div id="am" class="'+(msg&&msg.ok?'ok':'err')+'">'+esc(msg?msg.t:'')+'</div></form></div></div>');
+ +'<button class="btn" style="width:100%;margin-top:6px">'+(mode==='in'?'Se connecter':'Créer mon compte')+'</button>'+(mode==='in'?'<p style="margin:12px 0 0;text-align:center"><a href="#" id="fg">Mot de passe oublié ?</a></p>':'')+'<div id="am" class="'+(msg&&msg.ok?'ok':'err')+'">'+esc(msg?msg.t:'')+'</div></form></div></div>');
  bindEye('pw');
+ if($('#fg'))$('#fg').onclick=function(e){e.preventDefault();forgotView()};
  $('#tIn').onclick=function(){authView('in')};$('#tUp').onclick=function(){authView('up')};
  $('#af').onsubmit=async function(e){e.preventDefault();var em=$('#em').value.trim(),pw=$('#pw').value;$('#am').textContent='';
   try{
@@ -227,6 +245,29 @@ function authView(mode,msg){
    else{var r=await sb.auth.signUp({email:em,password:pw,options:{emailRedirectTo:location.origin+location.pathname}});if(r.error)throw r.error;
      if(!r.data.session){authView('in',{ok:true,t:'Compte créé. Ouvrez le lien reçu par e-mail pour le confirmer, puis connectez-vous.'});}}
   }catch(x){$('#am').className='err';$('#am').textContent=/Invalid login/i.test(x.message)?'E-mail ou mot de passe incorrect.':/not confirmed/i.test(x.message)?'Adresse e-mail pas encore confirmée.':x.message}}}
+
+var recovering=/type=recovery/.test(location.hash+location.search);
+function forgotView(msg){
+ app('<div style="max-width:440px;margin:40px auto"><div class="card"><h2>Mot de passe oublié</h2><p class="muted">Saisissez l\'adresse e-mail de votre compte. Nous vous envoyons un lien pour choisir un nouveau mot de passe.</p>'
+ +'<form id="ff2"><label for="em">Adresse e-mail</label><input id="em" type="email" autocomplete="email" required>'
+ +'<button class="btn" style="width:100%;margin-top:12px">Envoyer le lien</button><div id="fm" class="'+(msg&&msg.ok?'ok':'err')+'" role="status">'+esc(msg?msg.t:'')+'</div></form>'
+ +'<p style="margin:12px 0 0;text-align:center"><a href="#" id="bk3">Retour à la connexion</a></p></div></div>');
+ $('#bk3').onclick=function(e){e.preventDefault();authView('in')};
+ $('#ff2').onsubmit=async function(e){e.preventDefault();var b=$('#ff2 button');b.disabled=true;
+  try{var r=await sb.auth.resetPasswordForEmail($('#em').value.trim(),{redirectTo:location.origin+location.pathname});if(r.error)throw r.error;
+   forgotView({ok:true,t:'Si un compte existe avec cette adresse, un e-mail vient d\'être envoyé. Ouvrez le lien qu\'il contient (vérifiez aussi les courriers indésirables).'})}
+  catch(x){b.disabled=false;$('#fm').className='err';$('#fm').textContent=/rate limit|seconds/i.test(x.message||'')?'Trop de demandes. Patientez quelques minutes avant de réessayer.':(x.message||'Envoi impossible.')}}}
+function recoveryView(msg){
+ app('<div style="max-width:440px;margin:40px auto"><div class="card"><h2>Nouveau mot de passe</h2><p class="muted">Choisissez un nouveau mot de passe pour votre compte (8 caractères minimum).</p>'
+ +'<form id="rf"><label for="np">Nouveau mot de passe</label>'+pwField('np','new-password')
+ +'<button class="btn" style="width:100%;margin-top:12px">Enregistrer le mot de passe</button><div id="rm2" class="err" role="alert">'+esc(msg||'')+'</div></form></div></div>');
+ bindEye('np');
+ $('#rf').onsubmit=async function(e){e.preventDefault();var pw=$('#np').value;
+  if(pw.length<8){$('#rm2').textContent='8 caractères minimum.';return}
+  try{var r=await sb.auth.updateUser({password:pw});if(r.error)throw r.error;
+   recovering=false;try{history.replaceState(null,'',location.pathname)}catch(x){}
+   var g=await sb.auth.getSession();flash='Mot de passe modifié. Vous êtes connecté.';afterLogin(g.data.session)}
+  catch(x){$('#rm2').textContent=/same|different/i.test(x.message||'')?'Choisissez un mot de passe différent de l\'ancien.':(x.message||'Modification impossible.')}}}
 
 function newSocView(canCancel){
  app(bar(false)+'<div style="max-width:520px;margin:24px auto"><div class="card"><h2>'+(canCancel?'Nouvelle société':'Votre société')+'</h2><p class="muted">Donnez le nom de la société et choisissez son code. Vos enquêteurs saisiront ce code avant de remplir une fiche.</p>'
@@ -243,7 +284,7 @@ function newSocView(canCancel){
 
 async function loadSocietes(){
  soc=await api.societes();
- if(!soc.length){newSocView(false);return}
+ if(!soc.length){if(isAdmin){adminView('orph')}else newSocView(false);return}
  var saved=null;try{saved=localStorage.getItem('soc_cur')}catch(e){}
  cur=soc.find(function(s){return s.id===saved})||soc[0];filters={type:'',from:'',to:'',text:''};listView()}
 
@@ -253,6 +294,7 @@ function tableRows(){var v=visibleRows();if(!v.length)return'<tr><td colspan="5"
  return v.map(function(r){return'<tr class="link" data-id="'+r.id+'" tabindex="0"><td class="nowrap">'+esc(fdate(r.soumise_le))+'</td><td><span class="badge">'+esc(typeName(r.type_fiche))+'</span></td><td>'+esc(r.numero_fiche||'—')+'</td><td>'+esc(r.site||'—')+'</td><td><button class="btn ghost sm">Ouvrir</button></td></tr>'}).join('')}
 
 async function listView(){
+ backFn=null;
  var opts='<option value="">Tous les types</option>'+Object.keys(S).map(function(u){return'<option value="'+u+'"'+(filters.type===u?' selected':'')+'>'+esc(S[u].title)+'</option>'}).join('');
  var fl=flash;flash='';
  app(bar(true)+(fl?'<div class="card ok" role="status">'+esc(fl)+'</div>':'')
@@ -263,8 +305,12 @@ async function listView(){
  +'<div><label for="ff">Du</label><input id="ff" type="date" value="'+filters.from+'"></div><div><label for="fu">Au</label><input id="fu" type="date" value="'+filters.to+'"></div>'
  +'<div><label for="fx">Site ou numéro</label><input id="fx" value="'+esc(filters.text)+'" placeholder="Rechercher"></div></div>'
  +'<div class="scroll" style="margin-top:12px"><table><thead><tr><th>Date</th><th>Type</th><th>N° fiche</th><th>Site</th><th></th></tr></thead><tbody id="tb"><tr><td colspan="5" class="muted">Chargement…</td></tr></tbody></table></div>'
- +'<div class="row" style="margin-top:12px;align-items:center"><div id="cnt" class="muted" style="font-size:14px"></div><div class="fit"><button class="btn ghost sm" id="more" hidden>Voir plus</button></div><div class="fit"><button class="btn sm" id="xl">Exporter la liste (Excel)</button></div></div></div>');
+ +'<div class="row" style="margin-top:12px;align-items:center"><div id="cnt" class="muted" style="font-size:14px"></div><div class="fit"><button class="btn ghost sm" id="more" hidden>Voir plus</button></div><div class="fit"><button class="btn sm" id="xl">Exporter la liste (Excel)</button></div></div></div>'
+ +'<div class="card"><h2>Sauvegarde complète</h2><p class="muted">Télécharge dans un seul fichier ZIP toutes les fiches de cette société : les réponses (fichier JSON), la liste (CSV), les photos et fichiers joints, et un Excel rangé par fiche. À faire régulièrement : après 6 mois, les fiches ne sont plus chez Kobo.</p>'
+ +'<label class="chk"><input type="checkbox" id="bkx" checked> Inclure un fichier Excel par fiche (plus long)</label>'
+ +'<div class="row" style="align-items:center;margin-top:12px"><div class="fit"><button class="btn sm" id="bk2">⬇ Télécharger la sauvegarde complète</button></div></div><div id="bkm" style="margin-top:10px"></div></div>');
  bindBar();
+ $('#bk2').onclick=function(){sauvegarde($('#bkx').checked)};
  $('#cp').onclick=async function(){try{await navigator.clipboard.writeText(cur.code);$('#cm').textContent='Code copié.'}catch(e){$('#cm').textContent='Sélectionnez le code et copiez-le.'}};
  $('#nc').onclick=function(){
   $('#cm').innerHTML='<div class="row" style="align-items:flex-start"><div><label for="nk">Nouveau code (6 à 24 caractères)</label><input id="nk" maxlength="24" value="'+genCode()+'" autocomplete="off" spellcheck="false"></div>'
@@ -299,7 +345,7 @@ async function trashView(){
  app(h);$('#bk').onclick=backHome;
  document.querySelectorAll('[data-rs]').forEach(function(b){b.onclick=async function(){try{await api.updateSociete(b.dataset.rs,{supprimee_le:null});trashView()}catch(x){$('#tm').textContent=errMsg(x)}}});
  document.querySelectorAll('[data-rf]').forEach(function(b){b.onclick=async function(){try{await api.setFicheDeleted(b.dataset.rf,false);trashView()}catch(x){$('#tm').textContent=errMsg(x)}}})}
-function backHome(){if(!soc.length){newSocView(false)}else{if(!cur||!soc.some(function(s){return s.id===cur.id}))cur=soc[0];listView()}}
+function backHome(){if(!soc.length){if(isAdmin)adminView();else newSocView(false)}else{if(!cur||!soc.some(function(s){return s.id===cur.id}))cur=soc[0];listView()}}
 
 function accountView(){
  var em=(user&&user.email)||'';
@@ -445,11 +491,11 @@ function gpsTab(f,st,data,box,flist){
 
 async function ficheView(id){
  app('<p class="muted" style="padding:40px 0">Chargement de la fiche…</p>');
- var f;try{f=await api.fiche(id)}catch(x){app('<div class="card err">'+esc(errMsg(x))+'</div><button class="btn ghost" id="bk">Retour</button>');$('#bk').onclick=listView;return}
+ var f;try{f=await api.fiche(id)}catch(x){app('<div class="card err">'+esc(errMsg(x))+'</div><button class="btn ghost" id="bk">Retour</button>');$('#bk').onclick=goBack;return}
  var st=S[f.type_fiche],data=f.donnees||{};
  var flist=[];FILES={};try{flist=await api.fichiers(f.uuid)}catch(x){flist=[]}
  flist.forEach(function(x){FILES[x.nom]=x});
- if(!st){app('<div class="card"><h2>Type de fiche inconnu</h2><p class="muted">'+esc(f.type_fiche)+'</p></div><button class="btn ghost" id="bk">Retour</button>');$('#bk').onclick=listView;return}
+ if(!st){app('<div class="card"><h2>Type de fiche inconnu</h2><p class="muted">'+esc(f.type_fiche)+'</p></div><button class="btn ghost" id="bk">Retour</button>');$('#bk').onclick=goBack;return}
  var secs=st.sections.map(function(s){return{s:s,tab:tabLabel(f.type_fiche,s),blocks:blocksOf(s,s.name+'/',data,st.choices,[])}});
  secs.push({s:{label:'Photos et fichiers'},tab:'📎 Photos et fichiers ('+flist.length+')',files:true});
  secs.push({s:{label:'Carte des points GPS'},tab:'📍 Carte GPS',gps:true});
@@ -471,7 +517,7 @@ async function ficheView(id){
   $('#bd').innerHTML=body();if(secs[cur2].gps)gpsTab(f,st,data,$('#gpsbox'),flist);
   $('#tb').querySelectorAll('button').forEach(function(b){b.onclick=function(){cur2=+b.dataset.i;paint();var on=$('#tb .on');if(on&&on.scrollIntoView)on.scrollIntoView({inline:'nearest',block:'nearest'})}})}
  app(head+'<div class="stabs" id="tb" role="tablist" aria-label="Sections de la fiche"></div><div id="bd"></div>');paint();
- $('#bk').onclick=listView;
+ $('#bk').onclick=goBack;if(backFn&&$('#rm'))$('#rm').hidden=true;
  $('#ve').onchange=function(){showEmpty=this.checked;if(!secs[cur2].gps&&!secs[cur2].files)$('#bd').innerHTML=body()};
  $('#rm').onclick=function(){$('#rmc').innerHTML='<div class="card"><p>Supprimer cette fiche ? Elle sera cachée pendant 30 jours, puis effacée définitivement. Vous pouvez la restaurer depuis la corbeille.</p><div class="row"><div class="fit"><button class="btn sm" id="ok1" style="background:var(--danger)">Supprimer</button></div><div class="fit"><button class="btn ghost sm" id="no1">Annuler</button></div></div><div id="re" class="err"></div></div>';
   $('#no1').onclick=function(){$('#rmc').innerHTML=''};
@@ -574,6 +620,37 @@ async function buildFicheWorkbook(f,st){
     b.rows.forEach(function(rw,i){ws.mergeCells(r,1,r,3);var sb2=ws.getCell(r,1);sb2.value='▸ Ligne '+(i+1);sb2.fill=fillOf(tint(s.color,.82));sb2.font={bold:true,color:{argb:'FF1E293B'}};sb2.alignment={indent:1};sb2.border=borders();r++;z=0;
      rw.forEach(function(c){row(null,c.label,c.val)})})}})});
  return wb}
+function loadJSZip(){return new Promise(function(res,rej){if(window.JSZip)return res();var s=document.createElement('script');s.src='https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js';s.onload=res;s.onerror=function(){rej(new Error('bibliothèque ZIP non chargée'))};document.head.appendChild(s)})}
+function safeName(s){return String(s).normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/[^A-Za-z0-9._-]+/g,'_')}
+async function sauvegarde(withExcel){
+ var m=$('#bkm'),b=$('#bk2'),say=function(t){m.innerHTML='<p class="muted">'+esc(t)+'</p>'};b.disabled=true;
+ try{
+  say('Chargement des fiches…');await loadJSZip();
+  var fl=await api.toutesFiches();
+  if(!fl.length){m.innerHTML='<p class="muted">Aucune fiche à sauvegarder.</p>';b.disabled=false;return}
+  fl.forEach(function(f){f.uuid=f.uuid||('id'+f.id)});
+  var files=await api.fichiersDe(fl.map(function(f){return f.uuid})),byF={},dir={},log=[],zip=new JSZip();
+  files.forEach(function(x){(byF[x.fiche_uuid]=byF[x.fiche_uuid]||[]).push(x)});
+  fl.forEach(function(f){dir[f.uuid]=safeName((f.numero_fiche||'sans-numero')+'_'+f.uuid.slice(0,8))});
+  zip.file('fiches.json',JSON.stringify(fl.map(function(f){return{uuid:f.uuid,type_fiche:f.type_fiche,type:(S[f.type_fiche]||{}).title||null,numero_fiche:f.numero_fiche,site:f.site,soumise_le:f.soumise_le,donnees:f.donnees}}),null,2));
+  var q=function(v){return'"'+String(v==null?'':v).replace(/"/g,'""')+'"'};
+  zip.file('index.csv','\ufeff'+['Date;Type;N° fiche;Site;Dossier des fichiers;Nombre de fichiers'].concat(fl.map(function(f){return[q(f.soumise_le),q((S[f.type_fiche]||{}).title||f.type_fiche),q(f.numero_fiche),q(f.site),q(dir[f.uuid]),(byF[f.uuid]||[]).length].join(';')})).join('\n'));
+  var done=0,total=files.length+(withExcel?fl.length:0);
+  for(var i=0;i<files.length;i++){var x=files[i];
+   try{var r=await fetch(x.url);if(!r.ok)throw new Error(r.status);zip.file('fichiers/'+dir[x.fiche_uuid]+'/'+safeName(x.nom),await r.blob())}
+   catch(e){log.push('Fichier non copié : '+x.nom+' ('+dir[x.fiche_uuid]+') : '+e.message)}
+   say('Préparation… '+(++done)+' / '+total)}
+  if(withExcel)for(var j=0;j<fl.length;j++){var f=fl[j],st=S[f.type_fiche];
+   try{if(!st)throw new Error('type de fiche inconnu');var wb=await buildFicheWorkbook(f,st);zip.file('excel/Fiche_'+dir[f.uuid]+'.xlsx',await wb.xlsx.writeBuffer())}
+   catch(e){log.push('Excel non créé : '+dir[f.uuid]+' : '+e.message)}
+   say('Préparation… '+(++done)+' / '+total)}
+  zip.file('LISEZ-MOI.txt','Sauvegarde de la société « '+cur.nom+' » faite le '+new Date().toLocaleString('fr-FR')+'.\n\nfiches.json : toutes les réponses (données brutes complètes).\nindex.csv : liste des fiches (s\'ouvre dans Excel).\nfichiers/ : photos et fichiers joints, un dossier par fiche.\n'+(withExcel?'excel/ : un fichier Excel rangé par fiche.\n':'')+'\n'+(log.length?'Problèmes rencontrés :\n'+log.join('\n'):'Aucun problème rencontré.'));
+  var blob=await zip.generateAsync({type:'blob',compression:'DEFLATE'},function(meta){say('Compression… '+Math.round(meta.percent)+' %')});
+  var a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=safeName('Sauvegarde_'+cur.nom+'_'+new Date().toISOString().slice(0,10))+'.zip';document.body.appendChild(a);a.click();
+  setTimeout(function(){URL.revokeObjectURL(a.href);a.remove()},4000);
+  m.innerHTML='<p class="ok">Sauvegarde téléchargée : '+fl.length+' fiche(s), '+files.length+' fichier(s).'+(log.length?' <span class="err">'+log.length+' problème(s), voir LISEZ-MOI.txt dans le ZIP.</span>':'')+'</p>'}
+ catch(e){m.innerHTML='<p class="err">Sauvegarde impossible : '+esc(e.message||e)+'</p>'}
+ b.disabled=false}
 async function downloadWb(wb,name){
  var buf=await wb.xlsx.writeBuffer();
  var blob=new Blob([buf],{type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'});
@@ -586,11 +663,79 @@ async function exportList(list){
  list.forEach(function(r,i){var x=ws.addRow([fdate(r.soumise_le),typeName(r.type_fiche),r.numero_fiche||'',r.site||'']);x.eachCell(function(c){c.fill=fillOf(i%2?'F8FAFC':'FFFFFF');c.border=borders()})});
  await downloadWb(wb,'Liste_fiches_'+new Date().toISOString().slice(0,10)+'.xlsx')}
 
+/* ---------- Espace administrateur ---------- */
+var isAdmin=false,backFn=null,adminTab='orph',adminF={soc:'',type:'',text:''},ADM={soc:[],fic:[]};
+function goBack(){if(backFn)backFn();else listView()}
+api.estAdmin=async function(){
+ if(DEMO)return true;
+ try{var r=await sb.rpc('est_admin');return !r.error&&r.data===true}catch(e){return false}};
+api.adminSocietes=async function(){
+ if(DEMO)return DB.soc.map(function(s){return{id:s.id,nom:s.nom,code:s.code,cree_le:s.cree_le,supprimee_le:s.supprimee_le,email:'demo@exemple.org',nb_fiches:DB.fiches.filter(function(r){return r.societe_id===s.id&&!r.supprimee_le}).length}});
+ return T(await sb.rpc('admin_societes'))};
+api.adminFiches=async function(){
+ function norm(r){r.code_saisi=r.code_saisi||(r.donnees&&r.donnees.code_societe)||'';delete r.donnees;return r}
+ if(DEMO)return DB.fiches.filter(function(r){return !r.supprimee_le}).map(function(r){return norm({id:r.id,uuid:r.uuid||('d'+r.id),type_fiche:r.type_fiche,numero_fiche:r.numero_fiche,site:r.site,societe:r.societe||(r.donnees&&r.donnees['p00_etape1/entete_societe'])||'',societe_id:r.societe_id,soumise_le:r.soumise_le,donnees:r.donnees})});
+ var q=sb.from('fiches').select('id,uuid,type_fiche,numero_fiche,site,societe,societe_id,soumise_le,code_saisi:donnees->>code_societe').is('supprimee_le',null).order('soumise_le',{ascending:false}).limit(1000);
+ var r=await q;
+ if(r.error){r=await sb.from('fiches').select('*').is('supprimee_le',null).order('soumise_le',{ascending:false}).limit(300);if(r.error)throw r.error;return r.data.map(norm)}
+ return r.data};
+api.adminRattacher=async function(uuid,sid){
+ if(DEMO){var f=DB.fiches.find(function(r){return(r.uuid||('d'+r.id))===uuid});if(f)f.societe_id=sid;return}
+ T(await sb.rpc('admin_rattacher',{p_fiche:uuid,p_societe:sid}))};
+
+async function adminView(tab,msg){
+ if(tab)adminTab=tab;backFn=function(){adminView()};
+ app('<p class="muted" style="padding:40px 0">Chargement de l\'espace administrateur…</p>');
+ try{ADM.soc=await api.adminSocietes();ADM.fic=await api.adminFiches()}
+ catch(x){app('<div class="card err">'+esc(errMsg(x))+'</div><button class="btn ghost" id="bk">Retour</button>');$('#bk').onclick=backHome;return}
+ var names={};ADM.soc.forEach(function(s){names[s.id]=s.nom});
+ var orph=ADM.fic.filter(function(r){return!r.societe_id});
+ var tabs=[['orph','À rattacher ('+orph.length+')'],['soc','Sociétés ('+ADM.soc.length+')'],['all','Toutes les fiches ('+ADM.fic.length+')']];
+ var h='<div class="top"><div class="row" style="align-items:center;flex:1 1 300px"><div><h1>Espace administrateur</h1><div class="muted" style="font-size:13px">Connecté : '+esc(user&&user.email||'')+'</div></div></div>'
+  +'<div class="row" style="flex:0 0 auto;align-items:center"><div class="fit"><button class="btn ghost sm" id="am">'+(soc.length?'Mon espace société':'Créer ma société')+'</button></div><div class="fit"><button class="btn ghost sm" id="lo">'+(DEMO?'Démo':'Se déconnecter')+'</button></div></div></div>'
+  +(msg?'<div class="card ok" role="status">'+esc(msg)+'</div>':'')
+  +'<div class="stabs" id="atb" role="tablist">'+tabs.map(function(t){return'<button role="tab" data-t="'+t[0]+'" aria-selected="'+(t[0]===adminTab)+'" class="'+(t[0]===adminTab?'on':'')+'">'+esc(t[1])+'</button>'}).join('')+'</div>';
+ var socOpts=function(sel,all){return(all?'<option value="">'+all+'</option>':'<option value="">Choisir une société…</option>')+ADM.soc.filter(function(s){return!s.supprimee_le}).map(function(s){return'<option value="'+esc(s.id)+'"'+(sel===s.id?' selected':'')+'>'+esc(s.nom)+'</option>'}).join('')};
+ var body='';
+ if(adminTab==='orph'){
+  body='<div class="card"><h2>Fiches à rattacher</h2><p class="muted">Ces fiches ont été reçues avec un code société inconnu ou erroné : aucune société ne les voit. Ouvrez la fiche si besoin, puis choisissez la société à laquelle elle appartient.</p>'
+   +(orph.length?'<div class="scroll"><table><thead><tr><th>Date</th><th>Type</th><th>N° fiche</th><th>Saisi par l\'enquêteur</th><th>Site</th><th>Action</th></tr></thead><tbody>'
+   +orph.map(function(r,i){return'<tr><td class="nowrap">'+esc(fdate(r.soumise_le))+'</td><td><span class="badge">'+esc(typeName(r.type_fiche))+'</span></td><td>'+esc(r.numero_fiche||'—')+'</td><td>'+esc(r.societe||'—')+'<br><span class="muted" style="font-size:13px">Code : '+esc(r.code_saisi||'—')+'</span></td><td>'+esc(r.site||'—')+'</td>'
+    +'<td><div style="display:flex;flex-direction:column;gap:6px;min-width:170px"><button class="btn ghost sm" data-o="'+r.id+'">Ouvrir la fiche</button><select data-s="'+i+'" aria-label="Société">'+socOpts('')+'</select><button class="btn sm" data-r="'+i+'">Rattacher</button></div></td></tr>'}).join('')+'</tbody></table></div>'
+   :'<p class="muted">Aucune fiche à rattacher.</p>')+'<div id="am2" class="err"></div></div>'}
+ else if(adminTab==='soc'){
+  body='<div class="card"><h2>Sociétés</h2><div class="scroll"><table><thead><tr><th>Société</th><th>Code</th><th>Compte (e-mail)</th><th>Fiches</th><th>Créée le</th><th></th></tr></thead><tbody>'
+   +(ADM.soc.length?ADM.soc.map(function(s){return'<tr><td>'+esc(s.nom)+(s.supprimee_le?' <span class="badge">corbeille</span>':'')+'</td><td><span class="code" style="font-size:14px">'+esc(s.code)+'</span></td><td>'+esc(s.email||'—')+'</td><td>'+esc(s.nb_fiches)+'</td><td class="nowrap">'+esc(fdate(s.cree_le))+'</td><td><button class="btn ghost sm" data-v="'+esc(s.id)+'">Voir les fiches</button></td></tr>'}).join(''):'<tr><td colspan="6" class="muted">Aucune société.</td></tr>')
+   +'</tbody></table></div></div>'}
+ else{
+  var opts='<option value="">Tous les types</option>'+Object.keys(S).map(function(u){return'<option value="'+u+'"'+(adminF.type===u?' selected':'')+'>'+esc(S[u].title)+'</option>'}).join('');
+  var t=adminF.text.toLowerCase();
+  var list=ADM.fic.filter(function(r){return(!adminF.soc||(adminF.soc==='_none'?!r.societe_id:r.societe_id===adminF.soc))&&(!adminF.type||r.type_fiche===adminF.type)&&(!t||((r.site||'')+' '+(r.numero_fiche||'')+' '+(r.societe||'')).toLowerCase().indexOf(t)>-1)});
+  body='<div class="card"><h2>Toutes les fiches</h2><div class="row"><div><label for="fs">Société</label><select id="fs"><option value="">Toutes</option><option value="_none"'+(adminF.soc==='_none'?' selected':'')+'>Sans société (à rattacher)</option>'+socOpts(adminF.soc,'').replace('<option value="">Choisir une société…</option>','')+'</select></div>'
+   +'<div><label for="ft">Type de fiche</label><select id="ft">'+opts+'</select></div><div><label for="fx">Site ou numéro</label><input id="fx" value="'+esc(adminF.text)+'" placeholder="Rechercher"></div></div>'
+   +'<div class="scroll" style="margin-top:12px"><table><thead><tr><th>Date</th><th>Société</th><th>Type</th><th>N° fiche</th><th>Site</th><th></th></tr></thead><tbody>'
+   +(list.length?list.slice(0,300).map(function(r){return'<tr class="link" data-o="'+r.id+'" tabindex="0"><td class="nowrap">'+esc(fdate(r.soumise_le))+'</td><td>'+esc(names[r.societe_id]||'— à rattacher —')+'</td><td><span class="badge">'+esc(typeName(r.type_fiche))+'</span></td><td>'+esc(r.numero_fiche||'—')+'</td><td>'+esc(r.site||'—')+'</td><td><button class="btn ghost sm">Ouvrir</button></td></tr>'}).join(''):'<tr><td colspan="6" class="muted">Aucune fiche pour ces critères.</td></tr>')
+   +'</tbody></table></div><div class="muted" style="font-size:14px;margin-top:8px">'+Math.min(list.length,300)+' fiche(s) affichée(s) sur '+list.length+(list.length>300?' (affinez la recherche)':'')+'</div></div>'}
+ app(h+body);
+ $('#lo').onclick=logout;$('#am').onclick=function(){soc.length?backHome():newSocView(true)};
+ $('#atb').querySelectorAll('button').forEach(function(b){b.onclick=function(){adminView(b.dataset.t)}});
+ document.querySelectorAll('[data-o]').forEach(function(b){b.onclick=function(e){e.stopPropagation();ficheView(b.dataset.o)}});
+ document.querySelectorAll('tr.link[data-o]').forEach(function(tr){tr.onkeydown=function(e){if(e.key==='Enter')ficheView(tr.dataset.o)}});
+ document.querySelectorAll('[data-v]').forEach(function(b){b.onclick=function(){adminF={soc:b.dataset.v,type:'',text:''};adminView('all')}});
+ document.querySelectorAll('[data-r]').forEach(function(b){b.onclick=async function(){
+  var i=+b.dataset.r,sel=document.querySelector('[data-s="'+i+'"]');
+  if(!sel.value){$('#am2').textContent='Choisissez d\'abord une société.';return}
+  b.disabled=true;
+  try{await api.adminRattacher(orph[i].uuid,sel.value);adminView('orph','Fiche '+(orph[i].numero_fiche||'')+' rattachée à « '+names[sel.value]+' ».')}
+  catch(x){b.disabled=false;$('#am2').textContent=errMsg(x)}}});
+ if($('#fs')){$('#fs').onchange=function(){adminF.soc=this.value;adminView('all')};$('#ft').onchange=function(){adminF.type=this.value;adminView('all')};
+  $('#fx').onchange=function(){adminF.text=this.value;adminView('all')}}}
+
 /* ---------- Démarrage ---------- */
 async function afterLogin(session){
  if(!session){authView('in');return}
  user=session.user;
- try{var st=await api.statutCompte();if(st){restoreView(st.supprime_le);return}await loadSocietes()}
+ try{isAdmin=await api.estAdmin();var st=await api.statutCompte();if(st){restoreView(st.supprime_le);return}await loadSocietes()}
  catch(x){app('<div class="card err">'+esc(errMsg(x))+'</div>')}}
 (async function(){
  try{S=await (await fetch('structure.json')).json()}catch(e){app('<div class="card err">Impossible de charger la structure des fiches.</div>');return}
@@ -599,6 +744,8 @@ async function afterLogin(session){
  var started=false;
  sb.auth.onAuthStateChange(function(ev,s){
   setTimeout(function(){ // différé : ne pas appeler la base à l'intérieur de l'écouteur
+   if(ev==='PASSWORD_RECOVERY'){started=true;recovering=true;recoveryView();return}
+   if(recovering&&(ev==='INITIAL_SESSION'||ev==='SIGNED_IN')){started=true;if(s)recoveryView();else authView('in',{ok:false,t:'Lien expiré ou déjà utilisé. Demandez un nouveau lien.'});return}
    if(ev==='INITIAL_SESSION'){started=true;afterLogin(s)}
    else if(ev==='SIGNED_IN'){started=true;if(!user||(s&&s.user.id!==user.id))afterLogin(s)}
    else if(ev==='SIGNED_OUT'){user=null;soc=[];cur=null;authView('in')}
