@@ -114,7 +114,7 @@ function daysLeft(d){return Math.max(0,30-Math.floor((Date.now()-new Date(d))/86
 function T(r){if(r.error)throw r.error;return r.data}
 var DEMO_ROWS=[
  {id:3,uuid:'u3',societe_id:'s1',supprimee_le:null,type_fiche:'ahm2fHGsKsTpU58MApoiB4',numero_fiche:'R-014/11/2026',site:null,soumise_le:'2026-11-17T16:20:00Z',donnees:{'p00_etape1/entete_societe':'Société test','p01_a_identification/a_numero_fiche':'R-014/11/2026'}},
- {id:2,societe_id:'s1',supprimee_le:null,type_fiche:'anVthKYbRWT62fEKEv84C7',numero_fiche:'E-007/11/2026',site:'Carrière de Mbour',soumise_le:'2026-11-12T09:05:00Z',donnees:{'p00_etape1/entete_societe':'Société test','p00_etape1/entete_site':'Carrière de Mbour','p01_a_identification/a_numero_fiche':'E-007/11/2026'}},
+ {id:2,uuid:'u2',societe_id:'s1',supprimee_le:null,type_fiche:'anVthKYbRWT62fEKEv84C7',numero_fiche:'E-007/11/2026',site:'Carrière de Mbour',soumise_le:'2026-11-12T09:05:00Z',donnees:{'p00_etape1/entete_mois':'2026-10-01','p00_etape1/entete_societe':'Société test','p00_etape1/entete_site':'Carrière de Mbour','p01_a_identification/a_numero_fiche':'E-007/11/2026'}},
  {id:1,societe_id:'s1',supprimee_le:null,type_fiche:'aiDFEjzPbb9XhQtxHMkEvp',numero_fiche:'F-100/11/2026',site:'Site de Kédougou',soumise_le:'2026-11-18T10:46:48Z',donnees:{
   code_societe:'A4159990','p00_etape1/titre':'petite_mine','p00_etape1/entete_societe':'Société test','p00_etape1/entete_site':'Site de Kédougou',
   'p01_a_identification/a_numero_fiche':'F-100/11/2026','p03_c_gps/c_mode':'manuel',
@@ -125,6 +125,7 @@ var DEMO_ROWS=[
 var SVG=function(c){return'data:image/svg+xml;utf8,'+encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" width="320" height="240"><rect width="320" height="240" fill="'+c+'"/><text x="160" y="125" font-size="22" text-anchor="middle" fill="#fff">Photo test</text></svg>')};
 var DB={files:[{fiche_uuid:'u1',nom:'photo_test_1.jpg',mimetype:'image/jpeg',taille:245000,question:'p03_c_gps/c_points[1]/c_photo_1',url:SVG('#4A7FB0')},{fiche_uuid:'u1',nom:'TEST_kedougou.gpx',mimetype:'application/gpx+xml',taille:820,question:'p03_c_gps/c_import[1]/c_fichier',url:'data:application/gpx+xml;base64,PD94bWwgdmVyc2lvbj0iMS4wIj8+PGdweCB2ZXJzaW9uPSIxLjEiIHhtbG5zPSJodHRwOi8vd3d3LnRvcG9ncmFmaXguY29tL0dQWC8xLzEiPjx3cHQgbGF0PSIxMi41NiIgbG9uPSItMTIuMTgiPjxuYW1lPkdQWC1URVNULTAwMTwvbmFtZT48ZGVzYz5Qb2ludCB0ZXN0IDE8L2Rlc2M+PC93cHQ+PHdwdCBsYXQ9IjEyLjU2MyIgbG9uPSItMTIuMTc2Ij48bmFtZT5HUFgtVEVTVC0wMDI8L25hbWU+PC93cHQ+PHRyaz48bmFtZT5UcmFjZSB0ZXN0PC9uYW1lPjx0cmtzZWc+PHRya3B0IGxhdD0iMTIuNTYiIGxvbj0iLTEyLjE4Ii8+PHRya3B0IGxhdD0iMTIuNTYzIiBsb249Ii0xMi4xNzYiLz48dHJrcHQgbGF0PSIxMi41NjYiIGxvbj0iLTEyLjE4MiIvPjwvdHJrc2VnPjwvdHJrPjwvZ3B4Pg=='}],soc:[{id:'s1',nom:'Société test',code:'A4159990',supprimee_le:null,cree_le:'2026-11-18T10:00:00Z'}],fiches:DEMO_ROWS,compte:null};
 DB.soc.push({id:'s2',nom:'Mines du Sud',code:'B7777777',supprimee_le:null,cree_le:'2026-11-19T10:00:00Z'});
+DB.fiches.push({id:5,uuid:'d5',societe_id:'s1',supprimee_le:null,type_fiche:'anVthKYbRWT62fEKEv84C7',numero_fiche:'E-008/11/2026',site:'carrière de mbour ',soumise_le:'2026-11-13T09:05:00Z',donnees:{'p00_etape1/entete_mois':'2026-10-01','p00_etape1/entete_societe':'Société test','p01_a_identification/a_numero_fiche':'E-008/11/2026'}});
 DB.fiches.push({id:4,uuid:'o4',societe_id:null,supprimee_le:null,type_fiche:'aiDFEjzPbb9XhQtxHMkEvp',numero_fiche:'F-201/11/2026',site:'Site inconnu',societe:'Mines du Sud',soumise_le:'2026-11-20T08:00:00Z',donnees:{code_societe:'B7777779','p00_etape1/entete_societe':'Mines du Sud','p01_a_identification/a_numero_fiche':'F-201/11/2026'}});
 function demoCheck(code,selfId){if(!code)return;if(!VALID.test(code))throw{code:'23514'};
  if(DB.soc.some(function(s){return s.id!==selfId&&s.code.toUpperCase()===code.toUpperCase()}))throw{code:'23505'}}
@@ -291,9 +292,9 @@ async function loadSocietes(){
 
 async function loadList(append){var r=await api.list(filters,append?rows.length:0);rows=append?rows.concat(r.data):r.data;total=r.count==null?rows.length:r.count}
 function stOf(r){var x=STAT[r.uuid];return x?x.statut:'recue'}
-function visibleRows(){var t=filters.text.toLowerCase();return rows.filter(function(r){return(!t||((r.site||'')+' '+(r.numero_fiche||'')).toLowerCase().indexOf(t)>-1)&&(!filters.stat||stOf(r)===filters.stat)})}
+function visibleRows(){var t=filters.text.toLowerCase();return rows.filter(function(r){return(!t||((r.site||'')+' '+(r.numero_fiche||'')).toLowerCase().indexOf(t)>-1)&&(!filters.stat||(filters.stat==='_dup'?!!DUP[r.uuid]:stOf(r)===filters.stat))})}
 function tableRows(){var v=visibleRows();if(!v.length)return'<tr><td colspan="6" class="muted">Aucune fiche pour ces critères.</td></tr>';
- return v.map(function(r){return'<tr class="link" data-id="'+r.id+'" tabindex="0"><td class="nowrap">'+esc(fdate(r.soumise_le))+'</td><td><span class="badge">'+esc(typeName(r.type_fiche))+'</span></td><td>'+esc(r.numero_fiche||'—')+'</td><td>'+esc(r.site||'—')+'</td><td>'+stBadge(r.uuid)+'</td><td><button class="btn ghost sm">Ouvrir</button></td></tr>'}).join('')}
+ return v.map(function(r){return'<tr class="link" data-id="'+r.id+'" tabindex="0"><td class="nowrap">'+esc(fdate(r.soumise_le))+'</td><td><span class="badge">'+esc(typeName(r.type_fiche))+'</span></td><td>'+esc(r.numero_fiche||'—')+'</td><td>'+esc(r.site||'—')+'</td><td>'+stBadge(r.uuid)+dupBadge(r.uuid)+'</td><td><button class="btn ghost sm">Ouvrir</button></td></tr>'}).join('')}
 
 async function listView(){
  backFn=null;
@@ -305,7 +306,7 @@ async function listView(){
  +'<div class="fit"><button class="btn ghost sm" id="nc">Changer le code</button></div><div class="fit"><button class="btn ghost sm" id="ds">Supprimer cette société</button></div></div><div id="cm" style="margin-top:10px"></div></div>'
  +'<div class="card"><h2>Fiches reçues</h2><div class="row"><div><label for="ft">Type de fiche</label><select id="ft">'+opts+'</select></div>'
  +'<div><label for="ff">Du</label><input id="ff" type="date" value="'+filters.from+'"></div><div><label for="fu">Au</label><input id="fu" type="date" value="'+filters.to+'"></div>'
- +'<div><label for="fst">Statut</label><select id="fst"><option value="">Tous</option>'+Object.keys(ST_LABEL).map(function(k){return'<option value="'+k+'"'+(filters.stat===k?' selected':'')+'>'+ST_LABEL[k]+'</option>'}).join('')+'</select></div>'
+ +'<div><label for="fst">Statut</label><select id="fst"><option value="">Tous</option>'+Object.keys(ST_LABEL).map(function(k){return'<option value="'+k+'"'+(filters.stat===k?' selected':'')+'>'+ST_LABEL[k]+'</option>'}).join('')+'<option value="_dup"'+(filters.stat==='_dup'?' selected':'')+'>Doublons possibles</option></select></div>'
  +'<div><label for="fx">Site ou numéro</label><input id="fx" value="'+esc(filters.text)+'" placeholder="Rechercher"></div></div>'
  +'<div class="scroll" style="margin-top:12px"><table><thead><tr><th>Date</th><th>Type</th><th>N° fiche</th><th>Site</th><th>Statut</th><th></th></tr></thead><tbody id="tb"><tr><td colspan="6" class="muted">Chargement…</td></tr></tbody></table></div>'
  +'<div class="row" style="margin-top:12px;align-items:center"><div id="cnt" class="muted" style="font-size:14px"></div><div class="fit"><button class="btn ghost sm" id="more" hidden>Voir plus</button></div><div class="fit"><button class="btn sm" id="xl">Exporter la liste (Excel)</button></div></div></div>'
@@ -326,7 +327,7 @@ async function listView(){
   $('#cm').innerHTML='<p>Supprimer la société « '+esc(cur.nom)+' » ? Elle et ses fiches seront cachées pendant 30 jours, puis effacées définitivement. Son code n\'acceptera plus de fiches. Vous pouvez la restaurer depuis la corbeille.</p><div class="row"><div class="fit"><button class="btn sm" id="ok1" style="background:var(--danger)">Supprimer</button></div><div class="fit"><button class="btn ghost sm" id="no1">Annuler</button></div></div>';
   $('#no1').onclick=function(){$('#cm').textContent=''};
   $('#ok1').onclick=async function(){try{await api.updateSociete(cur.id,{supprimee_le:new Date().toISOString()});var n=cur.nom;try{localStorage.removeItem('soc_cur')}catch(e){}flash='Société « '+n+' » déplacée dans la corbeille pour 30 jours.';await loadSocietes()}catch(x){$('#cm').innerHTML='<span class="err">'+esc(errMsg(x))+'</span>'}}};
- async function reload(){try{await Promise.all([loadList(false),api.statuts()]);paint()}catch(x){$('#tb').innerHTML='<tr><td colspan="5" class="err">'+esc(errMsg(x))+'</td></tr>'}}
+ async function reload(){try{await Promise.all([loadList(false),api.statuts(),api.doublons()]);paint()}catch(x){$('#tb').innerHTML='<tr><td colspan="5" class="err">'+esc(errMsg(x))+'</td></tr>'}}
  function paint(){$('#tb').innerHTML=tableRows();var v=visibleRows();$('#cnt').textContent=v.length+' fiche(s) affichée(s) sur '+total;$('#more').hidden=rows.length>=total;
   $('#tb').querySelectorAll('tr.link').forEach(function(tr){tr.onclick=function(){ficheView(tr.dataset.id)};tr.onkeydown=function(e){if(e.key==='Enter')ficheView(tr.dataset.id)}})}
  $('#ft').onchange=function(){filters.type=this.value;reload()};$('#ff').onchange=function(){filters.from=this.value;reload()};$('#fu').onchange=function(){filters.to=this.value;reload()};
@@ -494,13 +495,18 @@ function gpsTab(f,st,data,box,flist){
 
 function stPanel(f){
  var box=$('#stc');if(!box)return;
- api.statuts().then(function(){draw()},function(){draw()});
+ Promise.all([api.statuts(),api.doublons()]).then(function(){draw()},function(){draw()});
  function draw(){
   var x=STAT[f.uuid]||{statut:'recue',note:''},k=x.statut;
-  box.innerHTML='<div class="row" style="align-items:center"><div class="fit"><strong>Statut de la fiche :</strong> '+stBadge(f.uuid)+'</div>'
+  box.innerHTML='<div class="row" style="align-items:center"><div class="fit"><strong>Statut de la fiche :</strong> '+stBadge(f.uuid)+dupBadge(f.uuid)+'</div>'
    +'<div class="fit"><button class="btn ghost sm" data-k="recue">Reçue</button></div><div class="fit"><button class="btn sm" data-k="verifiee">✔ Vérifiée</button></div><div class="fit"><button class="btn ghost sm" data-k="a_corriger">À corriger…</button></div></div>'
    +(k==='a_corriger'&&x.note?'<p style="margin:10px 0 0"><strong>Note :</strong> '+esc(x.note)+'</p>':'')
-   +'<div id="stn" style="margin-top:10px"></div><div id="stm" class="err"></div>';
+   +'<div id="dpl" style="margin-top:10px"></div><div id="stn" style="margin-top:10px"></div><div id="stm" class="err"></div>';
+  var peers=(DUPG[DUP[f.uuid]]||[]).filter(function(u){return u!==f.uuid});
+  if(peers.length)api.fichesParUuid(peers).then(function(l){var el=$('#dpl');if(!el)return;
+   el.innerHTML='<p style="margin:0 0 6px"><strong>Doublon possible :</strong> même type, même site et même mois que '+(l.length>1?'ces fiches':'cette fiche')+' :</p>'
+    +l.map(function(o){return'<button class="btn ghost sm" data-d="'+o.id+'" style="margin:0 8px 6px 0">N° '+esc(o.numero_fiche||'(sans numéro)')+' · '+esc(fdate(o.soumise_le))+'</button>'}).join('');
+   el.querySelectorAll('[data-d]').forEach(function(b){b.onclick=function(){ficheView(b.dataset.d)}})}).catch(function(){});
   async function save(st,note){try{await api.setStatut(f.uuid,st,note);draw()}catch(e){$('#stm').textContent=errMsg(e)}}
   box.querySelectorAll('[data-k]').forEach(function(b){b.onclick=function(){
    if(b.dataset.k==='a_corriger'){$('#stn').innerHTML='<label for="nt">Que faut-il corriger ? (note facultative)</label><input id="nt" maxlength="300" value="'+esc(x.note||'')+'"><div class="row" style="margin-top:8px"><div class="fit"><button class="btn sm" id="nok">Enregistrer</button></div><div class="fit"><button class="btn ghost sm" id="nno">Annuler</button></div></div>';
@@ -716,10 +722,25 @@ api.setStatut=async function(uuid,statut,note){
  if(DEMO){DB.stat=DB.stat||{};DB.stat[uuid]=row;STAT=DB.stat;return}
  T(await sb.from('fiches_statut').upsert(row,{onConflict:'fiche_uuid'}).select('fiche_uuid').single());STAT[uuid]=row};
 
+var DUP={},DUPG={};
+api.doublons=async function(){
+ var m={},g={};
+ try{
+  if(DEMO){var seen={};DB.fiches.filter(function(r){return!r.supprimee_le&&r.donnees&&r.donnees['p00_etape1/entete_mois']}).forEach(function(r){
+    var k=[r.type_fiche,r.societe_id,String(r.site||'').trim().toLowerCase(),String(r.donnees['p00_etape1/entete_mois']).slice(0,7)].join('|');(seen[k]=seen[k]||[]).push(r.uuid)});
+   Object.keys(seen).forEach(function(k){if(seen[k].length>1)seen[k].forEach(function(u){m[u]=k;(g[k]=g[k]||[]).push(u)})})}
+  else{var r=await sb.rpc('fiches_doublons');if(r.error)throw r.error;r.data.forEach(function(x){m[x.uuid]=x.groupe;(g[x.groupe]=g[x.groupe]||[]).push(x.uuid)})}
+ }catch(e){m={};g={}}
+ DUP=m;DUPG=g};
+function dupBadge(u){return DUP[u]?' <span class="badge sc" title="Même type, même site et même mois qu\'une autre fiche">Doublon ?</span>':''}
+api.fichesParUuid=async function(uuids){
+ if(DEMO)return DB.fiches.filter(function(r){return uuids.indexOf(r.uuid)>-1});
+ return T(await sb.from('fiches').select('id,uuid,numero_fiche,soumise_le').in('uuid',uuids))};
+
 async function adminView(tab,msg){
  if(tab)adminTab=tab;backFn=function(){adminView()};
  app('<p class="muted" style="padding:40px 0">Chargement de l\'espace administrateur…</p>');
- try{ADM.soc=await api.adminSocietes();ADM.fic=await api.adminFiches();await api.statuts()}
+ try{ADM.soc=await api.adminSocietes();ADM.fic=await api.adminFiches();await api.statuts();await api.doublons()}
  catch(x){app('<div class="card err">'+esc(errMsg(x))+'</div><button class="btn ghost" id="bk">Retour</button>');$('#bk').onclick=backHome;return}
  var names={};ADM.soc.forEach(function(s){names[s.id]=s.nom});
  var orph=ADM.fic.filter(function(r){return!r.societe_id});
@@ -747,7 +768,7 @@ async function adminView(tab,msg){
   body='<div class="card"><h2>Toutes les fiches</h2><div class="row"><div><label for="fs">Société</label><select id="fs"><option value="">Toutes</option><option value="_none"'+(adminF.soc==='_none'?' selected':'')+'>Sans société (à rattacher)</option>'+socOpts(adminF.soc,'').replace('<option value="">Choisir une société…</option>','')+'</select></div>'
    +'<div><label for="ft">Type de fiche</label><select id="ft">'+opts+'</select></div><div><label for="fx">Site ou numéro</label><input id="fx" value="'+esc(adminF.text)+'" placeholder="Rechercher"></div></div>'
    +'<div class="scroll" style="margin-top:12px"><table><thead><tr><th>Date</th><th>Société</th><th>Type</th><th>N° fiche</th><th>Site</th><th>Statut</th><th></th></tr></thead><tbody>'
-   +(list.length?list.slice(0,300).map(function(r){return'<tr class="link" data-o="'+r.id+'" tabindex="0"><td class="nowrap">'+esc(fdate(r.soumise_le))+'</td><td>'+esc(names[r.societe_id]||'— à rattacher —')+'</td><td><span class="badge">'+esc(typeName(r.type_fiche))+'</span></td><td>'+esc(r.numero_fiche||'—')+'</td><td>'+esc(r.site||'—')+'</td><td>'+stBadge(r.uuid)+'</td><td><button class="btn ghost sm">Ouvrir</button></td></tr>'}).join(''):'<tr><td colspan="7" class="muted">Aucune fiche pour ces critères.</td></tr>')
+   +(list.length?list.slice(0,300).map(function(r){return'<tr class="link" data-o="'+r.id+'" tabindex="0"><td class="nowrap">'+esc(fdate(r.soumise_le))+'</td><td>'+esc(names[r.societe_id]||'— à rattacher —')+'</td><td><span class="badge">'+esc(typeName(r.type_fiche))+'</span></td><td>'+esc(r.numero_fiche||'—')+'</td><td>'+esc(r.site||'—')+'</td><td>'+stBadge(r.uuid)+dupBadge(r.uuid)+'</td><td><button class="btn ghost sm">Ouvrir</button></td></tr>'}).join(''):'<tr><td colspan="7" class="muted">Aucune fiche pour ces critères.</td></tr>')
    +'</tbody></table></div><div class="muted" style="font-size:14px;margin-top:8px">'+Math.min(list.length,300)+' fiche(s) affichée(s) sur '+list.length+(list.length>300?' (affinez la recherche)':'')+'</div></div>'}
  app(h+body);
  $('#lo').onclick=logout;$('#am').onclick=function(){soc.length?backHome():newSocView(true)};
