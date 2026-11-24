@@ -9,14 +9,14 @@
 :root{
   --bg:#f3f6fa; --surface:#fff; --ink:#14202e; --muted:#55667a; --line:#d3dde8;
   --accent:#1f4e78; --accent-ink:#fff; --accent-soft:#ddebf7; --warn:#9a5b0f; --danger:#a12a2a;
-  --s1:#1f4e78; --s2:#4a7fb0; --s3:#9dc3e6; --s4:#e8c766; --s5:#b38b2e;
+  --s1:#1f4e78; --s2:#4a7fb0; --s3:#9dc3e6; --s4:#e8c766; --s5:#b38b2e; --okbg:#dcefdc; --okfg:#1d5c2a; --kobg:#fbe3d6; --kofg:#8a3a12;
   --fd:'Space Grotesk',system-ui,sans-serif; --fb:'Inter',system-ui,sans-serif;
   color-scheme:light;
 }
 @media (prefers-color-scheme:dark){:root:not([data-theme="light"]){
   --bg:#0f1822; --surface:#162230; --ink:#e6edf5; --muted:#9fb1c6; --line:#27394d;
   --accent:#7fb2e0; --accent-ink:#0a1b2b; --accent-soft:#1c3249; --warn:#e0a550; --danger:#ef8c8c;
-  --s1:#7fb2e0; --s2:#4a7fb0; --s3:#2b4f73; --s4:#c9a35e; --s5:#8a6a3a; color-scheme:dark}}
+  --s1:#7fb2e0; --s2:#4a7fb0; --s3:#2b4f73; --s4:#c9a35e; --s5:#8a6a3a; --okbg:#1d3a25; --okfg:#8fd5a1; --kobg:#4a2a1a; --kofg:#f0b48f; color-scheme:dark}}
 *{box-sizing:border-box}
 body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.55 var(--fb)}
 .strata{display:flex;height:10px}.strata i{display:block}
@@ -49,6 +49,7 @@ th,td{padding:9px 12px;text-align:left;border-bottom:1px solid var(--line);verti
 th{font-size:12px;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);white-space:nowrap}
 tbody tr.link{cursor:pointer}tbody tr.link:hover{background:var(--accent-soft)}
 td.nowrap{white-space:nowrap}
+.badge.sv{background:var(--okbg);color:var(--okfg)}.badge.sc{background:var(--kobg);color:var(--kofg)}
 .badge{display:inline-block;font-size:12px;font-weight:600;padding:2px 10px;border-radius:99px;background:var(--accent-soft);color:var(--accent);white-space:nowrap}
 .layout{display:grid;grid-template-columns:260px minmax(0,1fr);gap:16px;align-items:start}
 .nav{position:sticky;top:8px;display:flex;flex-direction:column;gap:4px;max-height:80vh;overflow:auto}
@@ -94,7 +95,7 @@ table.qt td.q{color:var(--muted);width:55%}
 <script>
 var CFG=window.CONFIG||{};
 var DEMO=!CFG.SUPABASE_URL||location.hash==='#demo';
-var S=null,sb=null,soc=[],cur=null,user=null,filters={type:'',from:'',to:'',text:''},rows=[],total=0,PAGE=50;
+var S=null,sb=null,soc=[],cur=null,user=null,filters={type:'',from:'',to:'',text:'',stat:''},rows=[],total=0,PAGE=50;
 var $=function(s){return document.querySelector(s)};
 function cleanLbl(l){return String(l).replace(/\s*[–-]?\s*n°\s*\$\{[^}]*\}/g,'').replace(/\$\{[^}]*\}/g,'').replace(/\s{2,}/g,' ').replace(/\s*[–-]\s*$/,'').trim()}
 function esc(s){return String(s==null?'':s).replace(/[&<>"']/g,function(c){return{'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]})}
@@ -112,7 +113,7 @@ function errMsg(x){var c=x&&x.code,m=(x&&x.message)||String(x);
 function daysLeft(d){return Math.max(0,30-Math.floor((Date.now()-new Date(d))/864e5))}
 function T(r){if(r.error)throw r.error;return r.data}
 var DEMO_ROWS=[
- {id:3,societe_id:'s1',supprimee_le:null,type_fiche:'ahm2fHGsKsTpU58MApoiB4',numero_fiche:'R-014/11/2026',site:null,soumise_le:'2026-11-17T16:20:00Z',donnees:{'p00_etape1/entete_societe':'Société test','p01_a_identification/a_numero_fiche':'R-014/11/2026'}},
+ {id:3,uuid:'u3',societe_id:'s1',supprimee_le:null,type_fiche:'ahm2fHGsKsTpU58MApoiB4',numero_fiche:'R-014/11/2026',site:null,soumise_le:'2026-11-17T16:20:00Z',donnees:{'p00_etape1/entete_societe':'Société test','p01_a_identification/a_numero_fiche':'R-014/11/2026'}},
  {id:2,societe_id:'s1',supprimee_le:null,type_fiche:'anVthKYbRWT62fEKEv84C7',numero_fiche:'E-007/11/2026',site:'Carrière de Mbour',soumise_le:'2026-11-12T09:05:00Z',donnees:{'p00_etape1/entete_societe':'Société test','p00_etape1/entete_site':'Carrière de Mbour','p01_a_identification/a_numero_fiche':'E-007/11/2026'}},
  {id:1,societe_id:'s1',supprimee_le:null,type_fiche:'aiDFEjzPbb9XhQtxHMkEvp',numero_fiche:'F-100/11/2026',site:'Site de Kédougou',soumise_le:'2026-11-18T10:46:48Z',donnees:{
   code_societe:'A4159990','p00_etape1/titre':'petite_mine','p00_etape1/entete_societe':'Société test','p00_etape1/entete_site':'Site de Kédougou',
@@ -141,7 +142,7 @@ var api={
  async list(f,from){
   if(DEMO){var l=DB.fiches.filter(function(r){return r.societe_id===cur.id&&!r.supprimee_le&&(!f.type||r.type_fiche===f.type)&&(!f.from||r.soumise_le.slice(0,10)>=f.from)&&(!f.to||r.soumise_le.slice(0,10)<=f.to)});
    return{data:l.slice(from,from+PAGE),count:l.length}}
-  var q=sb.from('fiches').select('id,type_fiche,numero_fiche,site,soumise_le',{count:'exact'}).eq('societe_id',cur.id).is('supprimee_le',null).order('soumise_le',{ascending:false}).range(from,from+PAGE-1);
+  var q=sb.from('fiches').select('id,uuid,type_fiche,numero_fiche,site,soumise_le',{count:'exact'}).eq('societe_id',cur.id).is('supprimee_le',null).order('soumise_le',{ascending:false}).range(from,from+PAGE-1);
   if(f.type)q=q.eq('type_fiche',f.type);if(f.from)q=q.gte('soumise_le',f.from);if(f.to)q=q.lte('soumise_le',f.to+'T23:59:59');
   var r=await q;if(r.error)throw r.error;return r},
  async toutesFiches(){
@@ -223,7 +224,7 @@ function bar(showSel){
  if(showSel&&soc.length)left='<div class="fit"><label for="sc" class="sr">Société</label><select id="sc">'+soc.map(function(s){return'<option value="'+esc(s.id)+'"'+(cur&&s.id===cur.id?' selected':'')+'>'+esc(s.nom)+'</option>'}).join('')+'</select></div><div class="fit"><button class="btn ghost sm" id="ns">+ Nouvelle société</button></div>';
  return'<div class="top"><div class="row" style="align-items:center;flex:1 1 300px">'+left+'</div><div class="row" style="flex:0 0 auto;align-items:center">'+(isAdmin?'<div class="fit"><button class="btn ghost sm" id="ad">Espace admin</button></div>':'')+'<div class="fit"><button class="btn ghost sm" id="gc">Corbeille</button></div><div class="fit"><button class="btn ghost sm" id="ga">Mon compte</button></div><div class="fit"><button class="btn ghost sm" id="lo">'+(DEMO?'Démo':'Se déconnecter')+'</button></div></div></div>'}
 function bindBar(){
- var e=$('#sc');if(e)e.onchange=function(){cur=soc.find(function(s){return s.id===e.value});try{localStorage.setItem('soc_cur',cur.id)}catch(x){}filters={type:'',from:'',to:'',text:''};listView()};
+ var e=$('#sc');if(e)e.onchange=function(){cur=soc.find(function(s){return s.id===e.value});try{localStorage.setItem('soc_cur',cur.id)}catch(x){}filters={type:'',from:'',to:'',text:'',stat:''};listView()};
  if($('#ns'))$('#ns').onclick=function(){newSocView(true)};
  if($('#ad'))$('#ad').onclick=function(){adminView('orph')};$('#gc').onclick=trashView;$('#ga').onclick=accountView;$('#lo').onclick=logout}
 function pwField(id,auto){return'<div class="pw"><input id="'+id+'" type="password" minlength="8" autocomplete="'+auto+'" required><button type="button" class="eye" id="'+id+'e" aria-label="Afficher le mot de passe" aria-pressed="false">'+EYE+'</button></div>'}
@@ -280,18 +281,19 @@ function newSocView(canCancel){
  $('#sf').onsubmit=async function(e){e.preventDefault();var k=$('#sk').value.trim();
   if(k&&!VALID.test(k)){$('#sm').textContent=errMsg({code:'23514'});return}
   try{var s=await api.createSociete($('#sn').value.trim(),k);soc=await api.societes();cur=soc.find(function(x){return x.id===s.id})||soc[0];
-   try{localStorage.setItem('soc_cur',cur.id)}catch(x){}filters={type:'',from:'',to:'',text:''};flash='Société créée. Son code : '+cur.code;listView()}catch(x){$('#sm').textContent=errMsg(x)}}}
+   try{localStorage.setItem('soc_cur',cur.id)}catch(x){}filters={type:'',from:'',to:'',text:'',stat:''};flash='Société créée. Son code : '+cur.code;listView()}catch(x){$('#sm').textContent=errMsg(x)}}}
 
 async function loadSocietes(){
  soc=await api.societes();
  if(!soc.length){if(isAdmin){adminView('orph')}else newSocView(false);return}
  var saved=null;try{saved=localStorage.getItem('soc_cur')}catch(e){}
- cur=soc.find(function(s){return s.id===saved})||soc[0];filters={type:'',from:'',to:'',text:''};listView()}
+ cur=soc.find(function(s){return s.id===saved})||soc[0];filters={type:'',from:'',to:'',text:'',stat:''};listView()}
 
 async function loadList(append){var r=await api.list(filters,append?rows.length:0);rows=append?rows.concat(r.data):r.data;total=r.count==null?rows.length:r.count}
-function visibleRows(){var t=filters.text.toLowerCase();return rows.filter(function(r){return!t||((r.site||'')+' '+(r.numero_fiche||'')).toLowerCase().indexOf(t)>-1})}
-function tableRows(){var v=visibleRows();if(!v.length)return'<tr><td colspan="5" class="muted">Aucune fiche pour ces critères.</td></tr>';
- return v.map(function(r){return'<tr class="link" data-id="'+r.id+'" tabindex="0"><td class="nowrap">'+esc(fdate(r.soumise_le))+'</td><td><span class="badge">'+esc(typeName(r.type_fiche))+'</span></td><td>'+esc(r.numero_fiche||'—')+'</td><td>'+esc(r.site||'—')+'</td><td><button class="btn ghost sm">Ouvrir</button></td></tr>'}).join('')}
+function stOf(r){var x=STAT[r.uuid];return x?x.statut:'recue'}
+function visibleRows(){var t=filters.text.toLowerCase();return rows.filter(function(r){return(!t||((r.site||'')+' '+(r.numero_fiche||'')).toLowerCase().indexOf(t)>-1)&&(!filters.stat||stOf(r)===filters.stat)})}
+function tableRows(){var v=visibleRows();if(!v.length)return'<tr><td colspan="6" class="muted">Aucune fiche pour ces critères.</td></tr>';
+ return v.map(function(r){return'<tr class="link" data-id="'+r.id+'" tabindex="0"><td class="nowrap">'+esc(fdate(r.soumise_le))+'</td><td><span class="badge">'+esc(typeName(r.type_fiche))+'</span></td><td>'+esc(r.numero_fiche||'—')+'</td><td>'+esc(r.site||'—')+'</td><td>'+stBadge(r.uuid)+'</td><td><button class="btn ghost sm">Ouvrir</button></td></tr>'}).join('')}
 
 async function listView(){
  backFn=null;
@@ -303,8 +305,9 @@ async function listView(){
  +'<div class="fit"><button class="btn ghost sm" id="nc">Changer le code</button></div><div class="fit"><button class="btn ghost sm" id="ds">Supprimer cette société</button></div></div><div id="cm" style="margin-top:10px"></div></div>'
  +'<div class="card"><h2>Fiches reçues</h2><div class="row"><div><label for="ft">Type de fiche</label><select id="ft">'+opts+'</select></div>'
  +'<div><label for="ff">Du</label><input id="ff" type="date" value="'+filters.from+'"></div><div><label for="fu">Au</label><input id="fu" type="date" value="'+filters.to+'"></div>'
+ +'<div><label for="fst">Statut</label><select id="fst"><option value="">Tous</option>'+Object.keys(ST_LABEL).map(function(k){return'<option value="'+k+'"'+(filters.stat===k?' selected':'')+'>'+ST_LABEL[k]+'</option>'}).join('')+'</select></div>'
  +'<div><label for="fx">Site ou numéro</label><input id="fx" value="'+esc(filters.text)+'" placeholder="Rechercher"></div></div>'
- +'<div class="scroll" style="margin-top:12px"><table><thead><tr><th>Date</th><th>Type</th><th>N° fiche</th><th>Site</th><th></th></tr></thead><tbody id="tb"><tr><td colspan="5" class="muted">Chargement…</td></tr></tbody></table></div>'
+ +'<div class="scroll" style="margin-top:12px"><table><thead><tr><th>Date</th><th>Type</th><th>N° fiche</th><th>Site</th><th>Statut</th><th></th></tr></thead><tbody id="tb"><tr><td colspan="6" class="muted">Chargement…</td></tr></tbody></table></div>'
  +'<div class="row" style="margin-top:12px;align-items:center"><div id="cnt" class="muted" style="font-size:14px"></div><div class="fit"><button class="btn ghost sm" id="more" hidden>Voir plus</button></div><div class="fit"><button class="btn sm" id="xl">Exporter la liste (Excel)</button></div></div></div>'
  +'<div class="card"><h2>Sauvegarde complète</h2><p class="muted">Télécharge dans un seul fichier ZIP toutes les fiches de cette société : les réponses (fichier JSON), la liste (CSV), les photos et fichiers joints, et un Excel rangé par fiche. À faire régulièrement : après 6 mois, les fiches ne sont plus chez Kobo.</p>'
  +'<label class="chk"><input type="checkbox" id="bkx" checked> Inclure un fichier Excel par fiche (plus long)</label>'
@@ -323,12 +326,12 @@ async function listView(){
   $('#cm').innerHTML='<p>Supprimer la société « '+esc(cur.nom)+' » ? Elle et ses fiches seront cachées pendant 30 jours, puis effacées définitivement. Son code n\'acceptera plus de fiches. Vous pouvez la restaurer depuis la corbeille.</p><div class="row"><div class="fit"><button class="btn sm" id="ok1" style="background:var(--danger)">Supprimer</button></div><div class="fit"><button class="btn ghost sm" id="no1">Annuler</button></div></div>';
   $('#no1').onclick=function(){$('#cm').textContent=''};
   $('#ok1').onclick=async function(){try{await api.updateSociete(cur.id,{supprimee_le:new Date().toISOString()});var n=cur.nom;try{localStorage.removeItem('soc_cur')}catch(e){}flash='Société « '+n+' » déplacée dans la corbeille pour 30 jours.';await loadSocietes()}catch(x){$('#cm').innerHTML='<span class="err">'+esc(errMsg(x))+'</span>'}}};
- async function reload(){try{await loadList(false);paint()}catch(x){$('#tb').innerHTML='<tr><td colspan="5" class="err">'+esc(errMsg(x))+'</td></tr>'}}
+ async function reload(){try{await Promise.all([loadList(false),api.statuts()]);paint()}catch(x){$('#tb').innerHTML='<tr><td colspan="5" class="err">'+esc(errMsg(x))+'</td></tr>'}}
  function paint(){$('#tb').innerHTML=tableRows();var v=visibleRows();$('#cnt').textContent=v.length+' fiche(s) affichée(s) sur '+total;$('#more').hidden=rows.length>=total;
   $('#tb').querySelectorAll('tr.link').forEach(function(tr){tr.onclick=function(){ficheView(tr.dataset.id)};tr.onkeydown=function(e){if(e.key==='Enter')ficheView(tr.dataset.id)}})}
  $('#ft').onchange=function(){filters.type=this.value;reload()};$('#ff').onchange=function(){filters.from=this.value;reload()};$('#fu').onchange=function(){filters.to=this.value;reload()};
- $('#fx').oninput=function(){filters.text=this.value;paint()};
- $('#more').onclick=async function(){await loadList(true);paint()};
+ $('#fx').oninput=function(){filters.text=this.value;paint()};$('#fst').onchange=function(){filters.stat=this.value;paint()};
+ $('#more').onclick=async function(){await loadList(true);await api.statuts();paint()};
  $('#xl').onclick=function(){exportList(visibleRows()).catch(function(x){$('#cm').innerHTML='<span class="err">'+esc(x.message)+'</span>'})};
  reload()}
 
@@ -489,6 +492,21 @@ function gpsTab(f,st,data,box,flist){
  return Promise.all(gpxFiles.map(function(x){return fetch(x.url).then(function(r){if(!r.ok)throw new Error(r.status);return r.text()}).then(function(t){var g=parseGpx(t,x.nom);if(!g)throw new Error('fichier illisible');gpxPts=gpxPts.concat(g.pts);gpxTr=gpxTr.concat(g.trs)}).catch(function(e){gpxErr.push('GPX « '+x.nom+' » non lu : '+e.message)})})).then(draw);
 }
 
+function stPanel(f){
+ var box=$('#stc');if(!box)return;
+ api.statuts().then(function(){draw()},function(){draw()});
+ function draw(){
+  var x=STAT[f.uuid]||{statut:'recue',note:''},k=x.statut;
+  box.innerHTML='<div class="row" style="align-items:center"><div class="fit"><strong>Statut de la fiche :</strong> '+stBadge(f.uuid)+'</div>'
+   +'<div class="fit"><button class="btn ghost sm" data-k="recue">Reçue</button></div><div class="fit"><button class="btn sm" data-k="verifiee">✔ Vérifiée</button></div><div class="fit"><button class="btn ghost sm" data-k="a_corriger">À corriger…</button></div></div>'
+   +(k==='a_corriger'&&x.note?'<p style="margin:10px 0 0"><strong>Note :</strong> '+esc(x.note)+'</p>':'')
+   +'<div id="stn" style="margin-top:10px"></div><div id="stm" class="err"></div>';
+  async function save(st,note){try{await api.setStatut(f.uuid,st,note);draw()}catch(e){$('#stm').textContent=errMsg(e)}}
+  box.querySelectorAll('[data-k]').forEach(function(b){b.onclick=function(){
+   if(b.dataset.k==='a_corriger'){$('#stn').innerHTML='<label for="nt">Que faut-il corriger ? (note facultative)</label><input id="nt" maxlength="300" value="'+esc(x.note||'')+'"><div class="row" style="margin-top:8px"><div class="fit"><button class="btn sm" id="nok">Enregistrer</button></div><div class="fit"><button class="btn ghost sm" id="nno">Annuler</button></div></div>';
+    $('#nok').onclick=function(){save('a_corriger',$('#nt').value.trim())};$('#nno').onclick=function(){$('#stn').innerHTML=''}}
+   else save(b.dataset.k,'')}})}}
+
 async function ficheView(id){
  app('<p class="muted" style="padding:40px 0">Chargement de la fiche…</p>');
  var f;try{f=await api.fiche(id)}catch(x){app('<div class="card err">'+esc(errMsg(x))+'</div><button class="btn ghost" id="bk">Retour</button>');$('#bk').onclick=goBack;return}
@@ -504,6 +522,7 @@ async function ficheView(id){
   +'<h1 class="big">Fiche '+(f.numero_fiche?'N° '+esc(f.numero_fiche):'(sans numéro)')+'</h1>'
   +'<p class="muted" style="margin:0 0 16px">'+[esc(st.title),f.site?esc(f.site):'',cur?esc(cur.nom):'','soumise le '+esc(fdate(f.soumise_le))].filter(Boolean).join(' · ')+'</p>'
   +'<div class="row" style="align-items:center"><div class="fit"><button class="btn" id="dl">⬇ Télécharger l\'Excel de cette fiche</button></div><div class="fit"><button class="btn ghost" id="rm">Supprimer la fiche</button></div></div><div id="rmc" style="margin-top:12px"></div>'
+  +'<div class="card" id="stc" style="margin-top:12px"></div>'
   +'<label class="chk"><input type="checkbox" id="ve"> Afficher aussi les questions sans réponse</label>';
  function body(){var x=secs[cur2];if(x.files)return'<h2 class="stitle">Photos et fichiers joints</h2>'+filesHtml(flist);if(x.gps)return'<h2 class="stitle">Carte des points GPS</h2><div id="gpsbox"></div>';var vb=visibleBlocks(x.blocks,showEmpty),h='<h2 class="stitle">'+esc(x.s.label)+'</h2>',run=[];
   function flush(){if(run.length){h+=qaTable(run);run=[]}}
@@ -518,6 +537,7 @@ async function ficheView(id){
   $('#tb').querySelectorAll('button').forEach(function(b){b.onclick=function(){cur2=+b.dataset.i;paint();var on=$('#tb .on');if(on&&on.scrollIntoView)on.scrollIntoView({inline:'nearest',block:'nearest'})}})}
  app(head+'<div class="stabs" id="tb" role="tablist" aria-label="Sections de la fiche"></div><div id="bd"></div>');paint();
  $('#bk').onclick=goBack;if(backFn&&$('#rm'))$('#rm').hidden=true;
+ stPanel(f);
  $('#ve').onchange=function(){showEmpty=this.checked;if(!secs[cur2].gps&&!secs[cur2].files)$('#bd').innerHTML=body()};
  $('#rm').onclick=function(){$('#rmc').innerHTML='<div class="card"><p>Supprimer cette fiche ? Elle sera cachée pendant 30 jours, puis effacée définitivement. Vous pouvez la restaurer depuis la corbeille.</p><div class="row"><div class="fit"><button class="btn sm" id="ok1" style="background:var(--danger)">Supprimer</button></div><div class="fit"><button class="btn ghost sm" id="no1">Annuler</button></div></div><div id="re" class="err"></div></div>';
   $('#no1').onclick=function(){$('#rmc').innerHTML=''};
@@ -683,10 +703,23 @@ api.adminRattacher=async function(uuid,sid){
  if(DEMO){var f=DB.fiches.find(function(r){return(r.uuid||('d'+r.id))===uuid});if(f)f.societe_id=sid;return}
  T(await sb.rpc('admin_rattacher',{p_fiche:uuid,p_societe:sid}))};
 
+/* ---------- Statut de validation ---------- */
+var STAT={},ST_LABEL={recue:'Reçue',verifiee:'Vérifiée',a_corriger:'À corriger'};
+function stBadge(u){var x=STAT[u],k=x?x.statut:'recue';return'<span class="badge'+(k==='verifiee'?' sv':k==='a_corriger'?' sc':'')+'">'+ST_LABEL[k]+'</span>'}
+api.statuts=async function(){
+ if(DEMO){STAT=DB.stat||(DB.stat={});return}
+ var m={},from=0,step=1000;
+ try{for(;;){var r=await sb.from('fiches_statut').select('fiche_uuid,statut,note').range(from,from+step-1);if(r.error)throw r.error;r.data.forEach(function(x){m[x.fiche_uuid]=x});if(r.data.length<step)break;from+=step}}catch(e){m={}}
+ STAT=m};
+api.setStatut=async function(uuid,statut,note){
+ var row={fiche_uuid:uuid,statut:statut,note:note||null,modifie_le:new Date().toISOString()};
+ if(DEMO){DB.stat=DB.stat||{};DB.stat[uuid]=row;STAT=DB.stat;return}
+ T(await sb.from('fiches_statut').upsert(row,{onConflict:'fiche_uuid'}).select('fiche_uuid').single());STAT[uuid]=row};
+
 async function adminView(tab,msg){
  if(tab)adminTab=tab;backFn=function(){adminView()};
  app('<p class="muted" style="padding:40px 0">Chargement de l\'espace administrateur…</p>');
- try{ADM.soc=await api.adminSocietes();ADM.fic=await api.adminFiches()}
+ try{ADM.soc=await api.adminSocietes();ADM.fic=await api.adminFiches();await api.statuts()}
  catch(x){app('<div class="card err">'+esc(errMsg(x))+'</div><button class="btn ghost" id="bk">Retour</button>');$('#bk').onclick=backHome;return}
  var names={};ADM.soc.forEach(function(s){names[s.id]=s.nom});
  var orph=ADM.fic.filter(function(r){return!r.societe_id});
@@ -713,8 +746,8 @@ async function adminView(tab,msg){
   var list=ADM.fic.filter(function(r){return(!adminF.soc||(adminF.soc==='_none'?!r.societe_id:r.societe_id===adminF.soc))&&(!adminF.type||r.type_fiche===adminF.type)&&(!t||((r.site||'')+' '+(r.numero_fiche||'')+' '+(r.societe||'')).toLowerCase().indexOf(t)>-1)});
   body='<div class="card"><h2>Toutes les fiches</h2><div class="row"><div><label for="fs">Société</label><select id="fs"><option value="">Toutes</option><option value="_none"'+(adminF.soc==='_none'?' selected':'')+'>Sans société (à rattacher)</option>'+socOpts(adminF.soc,'').replace('<option value="">Choisir une société…</option>','')+'</select></div>'
    +'<div><label for="ft">Type de fiche</label><select id="ft">'+opts+'</select></div><div><label for="fx">Site ou numéro</label><input id="fx" value="'+esc(adminF.text)+'" placeholder="Rechercher"></div></div>'
-   +'<div class="scroll" style="margin-top:12px"><table><thead><tr><th>Date</th><th>Société</th><th>Type</th><th>N° fiche</th><th>Site</th><th></th></tr></thead><tbody>'
-   +(list.length?list.slice(0,300).map(function(r){return'<tr class="link" data-o="'+r.id+'" tabindex="0"><td class="nowrap">'+esc(fdate(r.soumise_le))+'</td><td>'+esc(names[r.societe_id]||'— à rattacher —')+'</td><td><span class="badge">'+esc(typeName(r.type_fiche))+'</span></td><td>'+esc(r.numero_fiche||'—')+'</td><td>'+esc(r.site||'—')+'</td><td><button class="btn ghost sm">Ouvrir</button></td></tr>'}).join(''):'<tr><td colspan="6" class="muted">Aucune fiche pour ces critères.</td></tr>')
+   +'<div class="scroll" style="margin-top:12px"><table><thead><tr><th>Date</th><th>Société</th><th>Type</th><th>N° fiche</th><th>Site</th><th>Statut</th><th></th></tr></thead><tbody>'
+   +(list.length?list.slice(0,300).map(function(r){return'<tr class="link" data-o="'+r.id+'" tabindex="0"><td class="nowrap">'+esc(fdate(r.soumise_le))+'</td><td>'+esc(names[r.societe_id]||'— à rattacher —')+'</td><td><span class="badge">'+esc(typeName(r.type_fiche))+'</span></td><td>'+esc(r.numero_fiche||'—')+'</td><td>'+esc(r.site||'—')+'</td><td>'+stBadge(r.uuid)+'</td><td><button class="btn ghost sm">Ouvrir</button></td></tr>'}).join(''):'<tr><td colspan="7" class="muted">Aucune fiche pour ces critères.</td></tr>')
    +'</tbody></table></div><div class="muted" style="font-size:14px;margin-top:8px">'+Math.min(list.length,300)+' fiche(s) affichée(s) sur '+list.length+(list.length>300?' (affinez la recherche)':'')+'</div></div>'}
  app(h+body);
  $('#lo').onclick=logout;$('#am').onclick=function(){soc.length?backHome():newSocView(true)};
