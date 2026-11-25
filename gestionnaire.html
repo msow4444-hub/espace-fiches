@@ -113,11 +113,11 @@ function errMsg(x){var c=x&&x.code,m=(x&&x.message)||String(x);
 function daysLeft(d){return Math.max(0,30-Math.floor((Date.now()-new Date(d))/864e5))}
 function T(r){if(r.error)throw r.error;return r.data}
 var DEMO_ROWS=[
- {id:3,uuid:'u3',societe_id:'s1',supprimee_le:null,type_fiche:'ahm2fHGsKsTpU58MApoiB4',numero_fiche:'R-014/11/2026',site:null,soumise_le:'2026-11-17T16:20:00Z',donnees:{'p00_etape1/entete_societe':'Société test','p01_a_identification/a_numero_fiche':'R-014/11/2026'}},
+ {id:3,uuid:'u3',societe_id:'s1',supprimee_le:null,type_fiche:'ahm2fHGsKsTpU58MApoiB4',numero_fiche:'R-014/11/2026',site:null,soumise_le:'2026-11-17T16:20:00Z',donnees:{'p00_etape1/entete_mois':'2026-08-01','p00_etape1/entete_societe':'Société test','p01_a_identification/a_numero_fiche':'R-014/11/2026'}},
  {id:2,uuid:'u2',societe_id:'s1',supprimee_le:null,type_fiche:'anVthKYbRWT62fEKEv84C7',numero_fiche:'E-007/11/2026',site:'Carrière de Mbour',soumise_le:'2026-11-12T09:05:00Z',donnees:{'p00_etape1/entete_mois':'2026-10-01','p00_etape1/entete_societe':'Société test','p00_etape1/entete_site':'Carrière de Mbour','p01_a_identification/a_numero_fiche':'E-007/11/2026'}},
  {id:1,societe_id:'s1',supprimee_le:null,type_fiche:'aiDFEjzPbb9XhQtxHMkEvp',numero_fiche:'F-100/11/2026',site:'Site de Kédougou',soumise_le:'2026-11-18T10:46:48Z',donnees:{
   code_societe:'A4159990','p00_etape1/titre':'petite_mine','p00_etape1/entete_societe':'Société test','p00_etape1/entete_site':'Site de Kédougou',
-  'p01_a_identification/a_numero_fiche':'F-100/11/2026','p03_c_gps/c_mode':'manuel',
+  'p01_a_identification/a_numero_fiche':'F-100/11/2026','p00_etape1/entete_mois':'2026-09-01','p03_c_gps/c_mode':'manuel',
   'p03_c_gps/c_points':[
    {'p03_c_gps/c_points/c_date':'2026-11-18','p03_c_gps/c_points/c_appareil':'Garmin','p03_c_gps/c_points/c_point_num':'-001'},
    {'p03_c_gps/c_points/c_date':'2026-11-18','p03_c_gps/c_points/c_appareil':'Téléphone','p03_c_gps/c_points/c_point_num':'-002'}]}}
@@ -304,6 +304,7 @@ async function listView(){
  +'<div class="card"><h2>Code de la société « '+esc(cur.nom)+' »</h2><p class="muted">Donnez ce code à vos enquêteurs : ils le saisissent sur la page d\'accueil avant de remplir une fiche.</p>'
  +'<div class="row" style="align-items:center"><div class="fit"><span class="code" id="cd">'+esc(cur.code)+'</span></div><div class="fit"><button class="btn ghost sm" id="cp">Copier</button></div>'
  +'<div class="fit"><button class="btn ghost sm" id="nc">Changer le code</button></div><div class="fit"><button class="btn ghost sm" id="ds">Supprimer cette société</button></div></div><div id="cm" style="margin-top:10px"></div></div>'
+ +'<div class="card"><h2>Suivi mensuel</h2><p class="muted">Quels sites ont envoyé leur fiche chaque mois, et lesquels manquent.</p><button class="btn sm" id="sv">Ouvrir le suivi mensuel</button></div>'
  +'<div class="card"><h2>Fiches reçues</h2><div class="row"><div><label for="ft">Type de fiche</label><select id="ft">'+opts+'</select></div>'
  +'<div><label for="ff">Du</label><input id="ff" type="date" value="'+filters.from+'"></div><div><label for="fu">Au</label><input id="fu" type="date" value="'+filters.to+'"></div>'
  +'<div><label for="fst">Statut</label><select id="fst"><option value="">Tous</option>'+Object.keys(ST_LABEL).map(function(k){return'<option value="'+k+'"'+(filters.stat===k?' selected':'')+'>'+ST_LABEL[k]+'</option>'}).join('')+'<option value="_dup"'+(filters.stat==='_dup'?' selected':'')+'>Doublons possibles</option></select></div>'
@@ -314,6 +315,7 @@ async function listView(){
  +'<label class="chk"><input type="checkbox" id="bkx" checked> Inclure un fichier Excel par fiche (plus long)</label>'
  +'<div class="row" style="align-items:center;margin-top:12px"><div class="fit"><button class="btn sm" id="bk2">⬇ Télécharger la sauvegarde complète</button></div></div><div id="bkm" style="margin-top:10px"></div></div>');
  bindBar();
+ $('#sv').onclick=suiviView;
  $('#bk2').onclick=function(){sauvegarde($('#bkx').checked)};
  $('#cp').onclick=async function(){try{await navigator.clipboard.writeText(cur.code);$('#cm').textContent='Code copié.'}catch(e){$('#cm').textContent='Sélectionnez le code et copiez-le.'}};
  $('#nc').onclick=function(){
@@ -737,6 +739,50 @@ api.fichesParUuid=async function(uuids){
  if(DEMO)return DB.fiches.filter(function(r){return uuids.indexOf(r.uuid)>-1});
  return T(await sb.from('fiches').select('id,uuid,numero_fiche,soumise_le').in('uuid',uuids))};
 
+/* ---------- Suivi mensuel ---------- */
+api.suivi=async function(){
+ if(DEMO)return DB.fiches.filter(function(r){return!r.supprimee_le&&r.donnees&&r.donnees['p00_etape1/entete_mois']}).map(function(r){return{id:r.id,uuid:r.uuid||('d'+r.id),societe_id:r.societe_id,type_fiche:r.type_fiche,site:String(r.site||'').trim(),mois:String(r.donnees['p00_etape1/entete_mois']).slice(0,7)}});
+ return T(await sb.rpc('suivi_fiches'))};
+function moisLbl(m){return m.slice(5,7)+'/'+m.slice(0,4)}
+function lastMonths(n){var d=new Date(),out=[];for(var i=n-1;i>=0;i--){var x=new Date(d.getFullYear(),d.getMonth()-i,1);out.push(x.getFullYear()+'-'+('0'+(x.getMonth()+1)).slice(-2))}return out}
+function hiddenKey(sid){return'suivi_masques_'+sid}
+function getHidden(sid){try{return JSON.parse(localStorage.getItem(hiddenKey(sid))||'[]')}catch(e){return[]}}
+function setHidden(sid,a){try{localStorage.setItem(hiddenKey(sid),JSON.stringify(a))}catch(e){}}
+function suiviRender(box,all,sid,rerender){
+ var months=lastMonths(6),cm=months[months.length-1],hid=getHidden(sid),showHid=box._showHid||false;
+ var list=all.filter(function(r){return r.societe_id===sid});
+ var rowsM={};
+ list.forEach(function(r){var k=r.type_fiche+'|'+r.site.toLowerCase();var o=rowsM[k]||(rowsM[k]={k:k,type:r.type_fiche,site:r.site,first:r.mois,cells:{}});
+  if(r.mois<o.first)o.first=r.mois;(o.cells[r.mois]=o.cells[r.mois]||[]).push(r)});
+ var keys=Object.keys(rowsM).sort(function(a,b){return typeName(rowsM[a].type).localeCompare(typeName(rowsM[b].type))||rowsM[a].site.localeCompare(rowsM[b].site)});
+ var nHid=keys.filter(function(k){return hid.indexOf(k)>-1}).length;
+ var vis=keys.filter(function(k){return showHid||hid.indexOf(k)===-1});
+ var prev=months[months.length-2],act=keys.filter(function(k){return hid.indexOf(k)===-1&&rowsM[k].first<=prev});
+ var ok=act.filter(function(k){return rowsM[k].cells[prev]}).length;
+ var h='<p class="muted">Un site est attendu chaque mois dès sa première fiche reçue. Les mois en rouge sont des fiches manquantes ; le mois en cours n\'est pas encore compté comme manquant.</p>';
+ h+=act.length?'<p><strong>'+moisLbl(prev)+' :</strong> '+ok+' site(s) sur '+act.length+' ont envoyé leur fiche'+(ok<act.length?' — '+(act.length-ok)+' manquante(s).':'.')+'</p>':'';
+ if(!vis.length)h+='<p class="muted">Aucune fiche avec un mois couvert pour cette société.</p>';
+ else h+='<div class="scroll"><table><thead><tr><th>Site</th><th>Type</th>'+months.map(function(m){return'<th>'+moisLbl(m)+'</th>'}).join('')+'<th></th></tr></thead><tbody>'
+  +vis.map(function(k,i){var o=rowsM[k],isH=hid.indexOf(k)>-1;
+   return'<tr'+(isH?' style="opacity:.55"':'')+'><td>'+esc(o.site||'(sans site)')+'</td><td><span class="badge">'+esc(typeName(o.type))+'</span></td>'
+   +months.map(function(m){var c=o.cells[m];
+    if(c){return'<td>'+c.map(function(r){return'<button class="btn ghost sm" data-f="'+r.id+'" style="margin:0 4px 4px 0" title="Ouvrir la fiche">'+stBadge(r.uuid)+'</button>'}).join('')+'</td>'}
+    if(m<o.first)return'<td class="muted">—</td>';
+    if(m===cm)return'<td class="muted">à venir</td>';
+    return'<td><span class="badge sc">Manquante</span></td>'}).join('')
+   +'<td><button class="btn ghost sm" data-h="'+esc(k)+'">'+(isH?'Réafficher':'Masquer')+'</button></td></tr>'}).join('')+'</tbody></table></div>';
+ if(nHid)h+='<p style="margin-top:10px"><label class="chk"><input type="checkbox" id="sh"'+(showHid?' checked':'')+'> Afficher aussi les '+nHid+' site(s) masqué(s)</label></p>';
+ box.innerHTML=h;
+ box.querySelectorAll('[data-f]').forEach(function(b){b.onclick=function(){ficheView(b.dataset.f)}});
+ box.querySelectorAll('[data-h]').forEach(function(b){b.onclick=function(){var a=getHidden(sid),k=b.dataset.h,i=a.indexOf(k);if(i>-1)a.splice(i,1);else a.push(k);setHidden(sid,a);suiviRender(box,all,sid,rerender)}});
+ if($('#sh'))$('#sh').onchange=function(){box._showHid=this.checked;suiviRender(box,all,sid,rerender)}}
+async function suiviView(){
+ backFn=function(){suiviView()};
+ app(bar(true)+'<p style="margin:20px 0 0"><button class="btn ghost sm" id="bk">← Retour à la liste</button></p><div class="card"><h2>Suivi mensuel — '+esc(cur.nom)+'</h2><div id="sb"><p class="muted">Chargement…</p></div></div>');
+ bindBar();$('#bk').onclick=function(){backFn=null;listView()};
+ try{var all=await Promise.all([api.suivi(),api.statuts(),api.doublons()]).then(function(r){return r[0]});suiviRender($('#sb'),all,cur.id)}
+ catch(x){$('#sb').innerHTML='<span class="err">'+esc(errMsg(x))+'</span>'}}
+
 async function adminView(tab,msg){
  if(tab)adminTab=tab;backFn=function(){adminView()};
  app('<p class="muted" style="padding:40px 0">Chargement de l\'espace administrateur…</p>');
@@ -744,7 +790,7 @@ async function adminView(tab,msg){
  catch(x){app('<div class="card err">'+esc(errMsg(x))+'</div><button class="btn ghost" id="bk">Retour</button>');$('#bk').onclick=backHome;return}
  var names={};ADM.soc.forEach(function(s){names[s.id]=s.nom});
  var orph=ADM.fic.filter(function(r){return!r.societe_id});
- var tabs=[['orph','À rattacher ('+orph.length+')'],['soc','Sociétés ('+ADM.soc.length+')'],['all','Toutes les fiches ('+ADM.fic.length+')']];
+ var tabs=[['orph','À rattacher ('+orph.length+')'],['soc','Sociétés ('+ADM.soc.length+')'],['all','Toutes les fiches ('+ADM.fic.length+')'],['suivi','Suivi mensuel']];
  var h='<div class="top"><div class="row" style="align-items:center;flex:1 1 300px"><div><h1>Espace administrateur</h1><div class="muted" style="font-size:13px">Connecté : '+esc(user&&user.email||'')+'</div></div></div>'
   +'<div class="row" style="flex:0 0 auto;align-items:center"><div class="fit"><button class="btn ghost sm" id="am">'+(soc.length?'Mon espace société':'Créer ma société')+'</button></div><div class="fit"><button class="btn ghost sm" id="lo">'+(DEMO?'Démo':'Se déconnecter')+'</button></div></div></div>'
   +(msg?'<div class="card ok" role="status">'+esc(msg)+'</div>':'')
@@ -761,6 +807,9 @@ async function adminView(tab,msg){
   body='<div class="card"><h2>Sociétés</h2><div class="scroll"><table><thead><tr><th>Société</th><th>Code</th><th>Compte (e-mail)</th><th>Fiches</th><th>Créée le</th><th></th></tr></thead><tbody>'
    +(ADM.soc.length?ADM.soc.map(function(s){return'<tr><td>'+esc(s.nom)+(s.supprimee_le?' <span class="badge">corbeille</span>':'')+'</td><td><span class="code" style="font-size:14px">'+esc(s.code)+'</span></td><td>'+esc(s.email||'—')+'</td><td>'+esc(s.nb_fiches)+'</td><td class="nowrap">'+esc(fdate(s.cree_le))+'</td><td><button class="btn ghost sm" data-v="'+esc(s.id)+'">Voir les fiches</button></td></tr>'}).join(''):'<tr><td colspan="6" class="muted">Aucune société.</td></tr>')
    +'</tbody></table></div></div>'}
+ else if(adminTab==='suivi'){
+  var sel=adminF.suiviSoc||(ADM.soc[0]&&ADM.soc[0].id)||'';
+  body='<div class="card"><h2>Suivi mensuel</h2><label for="ss">Société</label><select id="ss">'+socOpts(sel,'').replace('<option value="">Choisir une société…</option>','')+'</select><div id="sb" style="margin-top:12px"></div></div>'}
  else{
   var opts='<option value="">Tous les types</option>'+Object.keys(S).map(function(u){return'<option value="'+u+'"'+(adminF.type===u?' selected':'')+'>'+esc(S[u].title)+'</option>'}).join('');
   var t=adminF.text.toLowerCase();
@@ -782,6 +831,7 @@ async function adminView(tab,msg){
   b.disabled=true;
   try{await api.adminRattacher(orph[i].uuid,sel.value);adminView('orph','Fiche '+(orph[i].numero_fiche||'')+' rattachée à « '+names[sel.value]+' ».')}
   catch(x){b.disabled=false;$('#am2').textContent=errMsg(x)}}});
+ if($('#ss')){var sid0=adminF.suiviSoc||$('#ss').value;api.suivi().then(function(all){suiviRender($('#sb'),all,sid0);$('#ss').onchange=function(){adminF.suiviSoc=this.value;$('#sb')._showHid=false;suiviRender($('#sb'),all,this.value)}}).catch(function(x){$('#sb').innerHTML='<span class="err">'+esc(errMsg(x))+'</span>'})}
  if($('#fs')){$('#fs').onchange=function(){adminF.soc=this.value;adminView('all')};$('#ft').onchange=function(){adminF.type=this.value;adminView('all')};
   $('#fx').onchange=function(){adminF.text=this.value;adminView('all')}}}
 
