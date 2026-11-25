@@ -626,27 +626,53 @@ async function buildFicheWorkbook(f,st){
  /* Une feuille par section */
  sheets.forEach(function(s){
   var ws=wb.addWorksheet(s.name,{properties:{tabColor:{argb:'FF'+s.color}},views:[{state:'frozen',ySplit:4}],pageSetup:{orientation:'portrait',fitToPage:true,fitToWidth:1,fitToHeight:0}});
-  ws.columns=[{width:7},{width:64},{width:50}];
-  ws.mergeCells('A1:C1');var h=ws.getCell('A1');h.value=s.sec.label;h.fill=fillOf(s.color);h.font={bold:true,size:16,color:{argb:'FFFFFFFF'}};h.alignment={vertical:'middle',indent:1,wrapText:true};ws.getRow(1).height=34;
-  ws.mergeCells('A2:C2');var h2=ws.getCell('A2');h2.value=sub;h2.font={size:11,color:{argb:'FF334155'}};h2.alignment={indent:1};
-  var head=ws.getRow(4);head.values=['N°','Question','Réponse'];head.eachCell(function(c){c.fill=fillOf(tint(s.color,.82));c.font={bold:true,color:{argb:'FF1E293B'}};c.border=borders()});head.getCell(1).alignment={horizontal:'center'};
-  var r=5,z=0;
-  function bandRow(txt){ws.mergeCells(r,1,r,3);var c=ws.getCell(r,1);c.value=txt;c.fill=fillOf(s.color);c.font={bold:true,size:12,color:{argb:'FFFFFFFF'}};c.alignment={vertical:'middle',indent:1,wrapText:true};ws.getRow(r).height=22;r++;z=0}
+  /* grille régulière : une colonne par question des tableaux ; les questions simples s'étendent sur plusieurs colonnes */
+  var keepOf=function(bk){if(!bk.rows.length)return[];var cols=bk.rows[0];return cols.map(function(c,i){return bk.rows.some(function(r){return r[i]&&r[i].val!==null&&r[i].val!==''})})};
+  var maxc=6;s.blocks.forEach(function(bk){if(bk.t==='rep'&&bk.rows.length){var n=keepOf(bk).filter(Boolean).length;if(n>maxc)maxc=n}});
+  var NC=maxc+1,W=15,qEnd=1+Math.ceil(maxc/2),qw=(qEnd-1)*W,aw=(NC-qEnd)*W;
+  var cols=[{width:6}];for(var ci=0;ci<maxc;ci++)cols.push({width:W});ws.columns=cols;
+  var lines=function(t,w){t=(t===null||t===undefined)?'':String(t);var n=0;t.split('\n').forEach(function(x){n+=Math.max(1,Math.ceil(x.length*1.15/w))});return n};
+  var NUMRE=/^-?[1-9]\d*([.,]\d+)?$|^0([.,]\d+)?$/;
+  var asVal=function(v){if(v===null||v===undefined||v==='')return'—';if(typeof v==='string'&&NUMRE.test(v.trim()))return Number(v.trim().replace(',','.'));return v};
+  ws.mergeCells(1,1,1,NC);var h=ws.getCell('A1');h.value=s.sec.label;h.fill=fillOf(s.color);h.font={bold:true,size:16,color:{argb:'FFFFFFFF'}};h.alignment={vertical:'middle',indent:1,wrapText:true};ws.getRow(1).height=34;
+  ws.mergeCells(2,1,2,NC);var h2=ws.getCell('A2');h2.value=sub;h2.font={size:11,color:{argb:'FF334155'}};h2.alignment={indent:1};
+  ws.views=[{state:'frozen',ySplit:3}];
+  var r=4,z=0;
+  function bandRow(txt){ws.mergeCells(r,1,r,NC);var c=ws.getCell(r,1);c.value=txt;c.fill=fillOf(s.color);c.font={bold:true,size:12,color:{argb:'FFFFFFFF'}};c.alignment={vertical:'middle',indent:1,wrapText:true};ws.getRow(r).height=Math.max(22,16*lines(txt,NC*W));r++;z=0}
   function row(num,label,val){var bg=(z++%2)?'F8FAFC':'FFFFFF',tone=answerTone(val),empty=(val===null||val==='');
-   var a=ws.getCell(r,1),b=ws.getCell(r,2),c=ws.getCell(r,3);
+   ws.mergeCells(r,2,r,qEnd);ws.mergeCells(r,qEnd+1,r,NC);
+   var a=ws.getCell(r,1),b=ws.getCell(r,2),c=ws.getCell(r,qEnd+1);
    a.value=(num===undefined||num===null)?'':num;b.value=label;c.value=empty?'—':val;
-   [a,b,c].forEach(function(x){x.fill=fillOf(bg);x.border=borders();x.alignment={vertical:'top',wrapText:true}});
+   for(var k=1;k<=NC;k++){var x=ws.getCell(r,k);x.fill=fillOf(bg);x.border=borders();x.alignment={vertical:'top',wrapText:true}}
    a.alignment={vertical:'top',horizontal:'center'};a.font={color:{argb:'FF94A3B8'}};b.font={color:{argb:'FF334155'}};
    c.alignment={vertical:'top',horizontal:'left',wrapText:true};
    if(empty)c.font={color:{argb:'FF94A3B8'}};else c.font={bold:true,color:{argb:'FF0F172A'}};
-   if(tone)c.fill=fillOf(TONE[tone]);r++}
+   if(tone){for(var k2=qEnd+1;k2<=NC;k2++)ws.getCell(r,k2).fill=fillOf(TONE[tone])}
+   var ln=Math.max(lines(label,qw),lines(empty?'—':val,aw));if(ln>1)ws.getRow(r).height=15*ln+2;r++}
+  function table(bk){
+   var keep=keepOf(bk),idx=[];keep.forEach(function(k,i){if(k)idx.push(i)});
+   var hd=ws.getCell(r,1);hd.value='N°';
+   var hl=1;
+   idx.forEach(function(i,j){var c=ws.getCell(r,j+2);c.value=bk.rows[0][i].label;hl=Math.max(hl,lines(c.value,W))});
+   for(var k=1;k<=idx.length+1;k++){var x=ws.getCell(r,k);x.fill=fillOf(tint(s.color,.82));x.font={bold:true,color:{argb:'FF1E293B'}};x.border=borders();x.alignment={horizontal:'center',vertical:'middle',wrapText:true}}
+   ws.getRow(r).height=Math.max(30,14*hl+6);r++;
+   var first=r;
+   bk.rows.forEach(function(rw,i){var bg=(i%2)?'F8FAFC':'FFFFFF',ml=1;
+    var n=ws.getCell(r,1);n.value=i+1;n.fill=fillOf(bg);n.border=borders();n.alignment={horizontal:'center',vertical:'top'};n.font={color:{argb:'FF94A3B8'}};
+    idx.forEach(function(ix,j){var cell=rw[ix],v=asVal(cell?cell.val:null),c=ws.getCell(r,j+2),tone=answerTone(cell?cell.val:null);
+     c.value=v;c.fill=fillOf(tone?TONE[tone]:bg);c.border=borders();
+     c.alignment={vertical:'top',wrapText:true,horizontal:(typeof v==='number')?'right':'left'};
+     c.font=(v==='—')?{color:{argb:'FF94A3B8'}}:{color:{argb:'FF0F172A'}};
+     ml=Math.max(ml,lines(typeof v==='number'?String(v):v,W))});
+    if(ml>1)ws.getRow(r).height=15*ml+2;r++});}
+  var nTab=0;
   s.blocks.forEach(function(b){
    if(b.t==='band')bandRow(b.label);
    else if(b.t==='qa')row(b.num,b.label,b.val);
-   else if(b.t==='rep'){bandRow(b.label);
-    if(!b.rows.length){ws.mergeCells(r,1,r,3);var e=ws.getCell(r,1);e.value='Aucune ligne saisie';e.font={italic:true,color:{argb:'FF94A3B8'}};e.alignment={indent:1};e.border=borders();r++}
-    b.rows.forEach(function(rw,i){ws.mergeCells(r,1,r,3);var sb2=ws.getCell(r,1);sb2.value='▸ Ligne '+(i+1);sb2.fill=fillOf(tint(s.color,.82));sb2.font={bold:true,color:{argb:'FF1E293B'}};sb2.alignment={indent:1};sb2.border=borders();r++;z=0;
-     rw.forEach(function(c){row(null,c.label,c.val)})})}})});
+   else if(b.t==='rep'){bandRow(b.label+(b.rows.length?' ('+b.rows.length+(b.rows.length>1?' lignes)':' ligne)'):''));
+    if(!b.rows.length){ws.mergeCells(r,1,r,NC);var e=ws.getCell(r,1);e.value='Aucune ligne saisie';e.font={italic:true,color:{argb:'FF94A3B8'}};e.alignment={indent:1};e.border=borders();r++}
+    else{table(b);nTab++}r++}});
+ });
  return wb}
 function loadJSZip(){return new Promise(function(res,rej){if(window.JSZip)return res();var s=document.createElement('script');s.src='https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js';s.onload=res;s.onerror=function(){rej(new Error('bibliothèque ZIP non chargée'))};document.head.appendChild(s)})}
 function safeName(s){return String(s).normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/[^A-Za-z0-9._-]+/g,'_')}
